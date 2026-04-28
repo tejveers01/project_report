@@ -1,0 +1,17 @@
+venv
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+.idea/
+*.log
+*.sqlite3
+*.env
+.env
+*.bak
+*.swp
+
+checklist/__pycache__/
+Milestone/__pycache__/
+Overall/__pycache__/
+NCR/__pycache__/

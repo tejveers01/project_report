@@ -1,0 +1,16 @@
+streamlit
+pandas
+requests==2.31.0
+python-dotenv==1.0.1
+aiohttp
+openpyxl
+python-dateutil
+ibm-cos-sdk==2.13.4
+botocore>=1.34.0
+tenacity
+xlsxwriter
+urllib3
+certifi
+beautifulsoup4
+psutil
+demjson3
