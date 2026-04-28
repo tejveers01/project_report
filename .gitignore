@@ -15,3 +15,7 @@ checklist/__pycache__/
 Milestone/__pycache__/
 Overall/__pycache__/
 NCR/__pycache__/
+checklist/.env
+Milestone/.env
+Overall/.env
+NCR/.env
