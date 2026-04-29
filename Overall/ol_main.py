@@ -159,6 +159,7 @@ cos_client = ibm_boto3.client(
 )
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def get_cos_files():
     try:
         response = cos_client.list_objects_v2(Bucket=COS_BUCKET)
@@ -190,75 +191,108 @@ def extract_date(file_name):
     return None
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_cos_file_bytes(file_key):
+    response = cos_client.get_object(Bucket=COS_BUCKET, Key=file_key)
+    return response["Body"].read()
+
+
+def select_report_files(files):
+    selected = {
+        "veridia_t4_finishing": None,
+        "veridia_t5_finishing": None,
+        "veridia_t7_finishing": None,
+        "eligo_tg_finishing": None,
+        "eligo_th_finishing": None,
+        "eligo_structure": None,
+        "wave_structure": None,
+        "ews_lig_structure": None,
+        "eden_structure": None,
+        "veridia_structure": None,
+    }
+
+    for file in files:
+        if file.startswith("Veridia") and "Tower 4 Finishing Tracker" in file:
+            selected["veridia_t4_finishing"] = file
+        elif file.startswith("Veridia") and "Tower 5 Finishing Tracker" in file:
+            selected["veridia_t5_finishing"] = file
+        elif file.startswith("Veridia") and "Tower 7 Finishing Tracker" in file:
+            selected["veridia_t7_finishing"] = file
+        elif file.startswith("Eligo") and "Tower G Finishing Tracker" in file:
+            selected["eligo_tg_finishing"] = file
+        elif file.startswith("Eligo") and "Tower H Finishing Tracker" in file:
+            selected["eligo_th_finishing"] = file
+        elif file.startswith("Eligo") and "Structure Work Tracker" in file:
+            selected["eligo_structure"] = file
+        elif file.startswith("Wave City Club") and "Structure Work Tracker Wave City Club all Block" in file:
+            selected["wave_structure"] = file
+        elif "EWS LIG" in file and "Structure Work Tracker" in file:
+            selected["ews_lig_structure"] = file
+        elif file.startswith("Eden") and "Structure Work Tracker" in file:
+            selected["eden_structure"] = file
+        elif file.startswith("Veridia") and "Structure Work Tracker" in file:
+            selected["veridia_structure"] = file
+
+    return selected
+
+
+def fetch_selected_cos_files(file_map):
+    bytes_map = {}
+    keys_to_fetch = [file_key for file_key in file_map.values() if file_key]
+
+    if not keys_to_fetch:
+        return bytes_map
+
+    max_workers = min(6, len(keys_to_fetch))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_key = {
+            executor.submit(fetch_cos_file_bytes, file_key): file_key
+            for file_key in keys_to_fetch
+        }
+        for future in concurrent.futures.as_completed(future_to_key):
+            file_key = future_to_key[future]
+            try:
+                bytes_map[file_key] = future.result()
+            except Exception as exc:
+                st.warning(f"Failed to fetch `{file_key}` from COS: {exc}")
+
+    return bytes_map
+
+
 
 
 def GetOverallreport(files):
-        
-        # st.session_state.overalldf = pd.DataFrame()
         ews_lig = {}
         veridia = {}
         eligo = {}
         eden_data = {}
         wave = {}
+        file_map = select_report_files(files)
+        fetched_files = fetch_selected_cos_files(file_map)
 
-        #VERIDIA TOWER 4
-        for file in files:
-            if file.startswith("Veridia") and "Tower 4 Finishing Tracker" in file:
-                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                Finishing.GetTower4Finishing(io.BytesIO(response['Body'].read()))
-                st.write(file,"✅")
-                
+        if file_map["veridia_t4_finishing"] in fetched_files:
+            Finishing.GetTower4Finishing(io.BytesIO(fetched_files[file_map["veridia_t4_finishing"]]))
 
-        #VERIDIA TOWER 4
-        for file in files:
-            if file.startswith("Veridia") and "Tower 5 Finishing Tracker" in file:
-               
-                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                Finishing.GetTower5Finishing(io.BytesIO(response['Body'].read()))
-                st.write(file,"✅")
+        if file_map["veridia_t5_finishing"] in fetched_files:
+            Finishing.GetTower5Finishing(io.BytesIO(fetched_files[file_map["veridia_t5_finishing"]]))
 
-        #VERIDIA TOWER 7
-        for file in files:
-            if file.startswith("Veridia") and "Tower 7 Finishing Tracker" in file:
-               
-                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                Finishing.GetTower7Finishing(io.BytesIO(response['Body'].read()))
-                st.write(file,"✅")
-    
-        # #ELIGO TOWER G
-        for file in files:
-            if file.startswith("Eligo") and "Tower G Finishing Tracker" in file:
-                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                Finishing.GetTowerGFinishing(io.BytesIO(response['Body'].read()))
-                st.write(file,"✅")
+        if file_map["veridia_t7_finishing"] in fetched_files:
+            Finishing.GetTower7Finishing(io.BytesIO(fetched_files[file_map["veridia_t7_finishing"]]))
 
-        #ELIGO TOWER H
-        for file in files:
-            if file.startswith("Eligo") and "Tower H Finishing Tracker" in file:
-                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                Finishing.GetTowerHFinishing(io.BytesIO(response['Body'].read()))
-                st.write(file,"✅")
+        if file_map["eligo_tg_finishing"] in fetched_files:
+            Finishing.GetTowerGFinishing(io.BytesIO(fetched_files[file_map["eligo_tg_finishing"]]))
 
-        for file in files:
-            if file.startswith("Eligo") and "Structure Work Tracker" in file:
-                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                eligo = Tower_G_and_H.ProcessGandH(io.BytesIO(response['Body'].read()))
-                st.write(file,"✅")
+        if file_map["eligo_th_finishing"] in fetched_files:
+            Finishing.GetTowerHFinishing(io.BytesIO(fetched_files[file_map["eligo_th_finishing"]]))
 
-        for file in files:
-            #WAVE CITY
-            if file.startswith("Wave City Club") and "Structure Work Tracker Wave City Club all Block" in file:
-                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                wave = Wavecity.GetWaveCity(io.BytesIO(response['Body'].read()))
-                # st.write(wave)
-                st.write(file,"✅")
+        if file_map["eligo_structure"] in fetched_files:
+            eligo = Tower_G_and_H.ProcessGandH(io.BytesIO(fetched_files[file_map["eligo_structure"]]))
 
-        # EWS LIG
-        for file in files:
-            if "EWS LIG" in file and "Structure Work Tracker" in file:
-                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                ews_lig = EWS_LIG.ProcessEWSLIG(io.BytesIO(response['Body'].read()))
-                st.write(file,"✅")
+        if file_map["wave_structure"] in fetched_files:
+            wave = Wavecity.GetWaveCity(io.BytesIO(fetched_files[file_map["wave_structure"]]))
+
+        if file_map["ews_lig_structure"] in fetched_files:
+            ews_lig = EWS_LIG.ProcessEWSLIG(io.BytesIO(fetched_files[file_map["ews_lig_structure"]]))
 
     
 
@@ -270,21 +304,13 @@ def GetOverallreport(files):
         #         st.write(file,"✅")
 
 
-        #EDEN
-        for file in files:
-             if file.startswith("Eden") and "Structure Work Tracker" in file:
-                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                eden_data = Eden.get_percentages(io.BytesIO(response['Body'].read()))
+        if file_map["eden_structure"] in fetched_files:
+            eden_data = Eden.get_percentages(io.BytesIO(fetched_files[file_map["eden_structure"]]))
 
 
        
-        # #VERIDIA TOWER 4
-        for file in files:
-            if file.startswith("Veridia") and "Structure Work Tracker" in file:
-                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                veridia = Veridia.ProcessVeridia(io.BytesIO(response['Body'].read()))
-                # st.write(veridia)
-                st.write(file,"✅")
+        if file_map["veridia_structure"] in fetched_files:
+            veridia = Veridia.ProcessVeridia(io.BytesIO(fetched_files[file_map["veridia_structure"]]))
 
         # for i in files_after_or_on_10th:
         #     st.write(i)
@@ -337,7 +363,6 @@ for key, month_files in project_map.items():
 
 
 st.header("OVERALL PROJECT REPORT")
-st.write(selected_files)
 
 if files and files[0] == "Error fetching COS files":
     st.warning(files[1])

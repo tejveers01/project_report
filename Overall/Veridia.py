@@ -118,7 +118,7 @@ def Tower2(sheet):
                 elif color == "FF00B0F0":
                     tower2.append(0)
             else:
-                st.write(f"Cell {col}{row} has no solid fill color, value: {cell.value}")
+                continue
 
 def Tower3(sheet):
     rows = [4, 5, 6, 7, 9, 10, 14, 15, 16, 17, 19, 20]
@@ -135,7 +135,7 @@ def Tower3(sheet):
                 elif color == "FF00B0F0":
                     tower3.append(0)
             else:
-                st.write(f"Cell {col}{row} has no solid fill color, value: {cell.value}")
+                continue
 
 def Tower4(sheet):
     rows = [4, 5, 6, 7, 9, 10, 14, 15, 16, 17, 19, 20]
@@ -152,7 +152,7 @@ def Tower4(sheet):
                 elif color == "FF00B0F0":
                     tower4.append(0)
             else:
-                st.write(f"Cell {col}{row} has no solid fill color, value: {cell.value}")
+                continue
 
 def Tower5(sheet):
     rows = [4, 5, 6, 7, 9, 10, 14, 15, 16, 17, 19, 20]
@@ -170,7 +170,7 @@ def Tower5(sheet):
                     tower5.append(0)
                 # Removed the problematic else clause that was adding extra zeros
             else:
-                st.write(f"Cell {col}{row} has no solid fill color, value: {cell.value}")
+                continue
 
 def Tower6(sheet):
     rows = [4, 5, 6, 7, 9, 10, 14, 15, 16, 17, 19, 20]
@@ -187,7 +187,7 @@ def Tower6(sheet):
                 elif color == "FF00B0F0":
                     tower6.append(0)
             else:
-                st.write(f"Cell {col}{row} has no solid fill color, value: {cell.value}")
+                continue
 
 def Tower7(sheet):
     rows = [4, 5, 6, 7, 9, 10, 14, 15, 16, 17, 19, 20]
@@ -204,7 +204,7 @@ def Tower7(sheet):
                 elif color == "FF00B0F0":
                     tower7.append(0)
             else:
-                st.write(f"Cell {col}{row} has no solid fill color, value: {cell.value}")
+                continue
 
 def calculate_structure_percentage(green_count, blue_count):
     """Calculate structure percentage using the correct formula"""
@@ -268,9 +268,6 @@ def ProcessVeridia(exceldatas):
         "Finishing": [st.session_state.tower2_finishing, st.session_state.tower3_finishing, st.session_state.tower4_finishing, st.session_state.tower5_finishing, st.session_state.tower6_finishing, st.session_state.tower7_finishing]
     }
     
-    st.write("Veridia")
-    st.table(data)
-    
     # Calculate structure percentages using the correct formula
     green_counts = data["Green (1)"]
     non_green_counts = data["Non-Green (0)"]
@@ -278,8 +275,6 @@ def ProcessVeridia(exceldatas):
     # Add structure percentages to data
     data["Structure"] = [calculate_structure_percentage(green, non_green) 
                         for green, non_green in zip(green_counts, non_green_counts)]
-    
-    st.dataframe(data)
     
     json_data = Processjson(data)
     

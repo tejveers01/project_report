@@ -129,7 +129,7 @@ def TowerF(sheet):
                 if color == "FF00B0F0":
                     towerf.append(0)
             else:
-                st.write(f"Cell {col}{row} has no solid fill color, value: {cell.value}")
+                continue
 
 def TowerG(sheet):
     # st.write("Analyzing Eligo Tower G")
@@ -148,7 +148,7 @@ def TowerG(sheet):
                 if color == "FF00B0F0":
                     towerg.append(0)
             else:
-                st.write(f"Cell {col}{row} has no solid fill color, value: {cell.value}")
+                continue
 
 def TowerH(sheet):
     # st.write("Analyzing Eligo Tower H")
@@ -167,7 +167,7 @@ def TowerH(sheet):
                 if color == "FF00B0F0":
                     towerh.append(0)
             else:
-                st.write(f"Cell {col}{row} has no solid fill color, value: {cell.value}")
+                continue
 
 
 
