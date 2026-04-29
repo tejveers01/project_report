@@ -1,4 +1,31 @@
 import streamlit as st
+import os
+import sys
+from pathlib import Path
+
+CURRENT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = CURRENT_DIR.parent
+
+if str(CURRENT_DIR) not in sys.path:
+    sys.path.insert(0, str(CURRENT_DIR))
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv(ROOT_DIR / ".env", override=True)
+except Exception:
+    pass
+
+def get_config_value(key, default=None):
+    """Read config from Streamlit secrets first, then root .env / environment."""
+    try:
+        if key in st.secrets:
+            return st.secrets[key]
+    except Exception:
+        pass
+    return os.getenv(key, default)
+
 import pandas as pd
 import requests
 import json
@@ -66,10 +93,24 @@ if 'wavecity_finishing' not in st.session_state:
 if 'overalldf' not in st.session_state:
     st.session_state.overalldf = pd.DataFrame()
 
-COS_API_KEY = "ehl6KMyT95fwzKf7sPW_X3eKFppy_24xbm4P1Yk-jqyU"
-COS_SERVICE_INSTANCE_ID = "crn:v1:bluemix:public:cloud-object-storage:global:a/fddc2a92db904306b413ed706665c2ff:e99c3906-0103-4257-bcba-e455e7ced9b7:bucket:projectreportnew"
-COS_ENDPOINT = "https://s3.us-south.cloud-object-storage.appdomain.cloud"
-COS_BUCKET = "projectreportnew"
+COS_API_KEY = get_config_value("COS_API_KEY")
+COS_SERVICE_INSTANCE_ID = get_config_value("COS_SERVICE_INSTANCE_ID")
+COS_ENDPOINT = get_config_value("COS_ENDPOINT", "https://s3.us-south.cloud-object-storage.appdomain.cloud")
+COS_BUCKET = get_config_value("COS_BUCKET", "projectreportnew")
+
+missing_cos = [
+    key for key, value in {
+        "COS_API_KEY": COS_API_KEY,
+        "COS_SERVICE_INSTANCE_ID": COS_SERVICE_INSTANCE_ID,
+        "COS_ENDPOINT": COS_ENDPOINT,
+        "COS_BUCKET": COS_BUCKET,
+    }.items()
+    if not value
+]
+
+if missing_cos:
+    st.error("❌ Missing COS configuration: " + ", ".join(missing_cos))
+    st.stop()
 
 
 def to_excel(df):
@@ -110,16 +151,16 @@ cos_client = ibm_boto3.client(
 
 def get_cos_files():
     try:
-        response = cos_client.list_objects_v2(Bucket="projectreportnew")
+        response = cos_client.list_objects_v2(Bucket=COS_BUCKET)
         files = [obj['Key'] for obj in response.get('Contents', []) if obj['Key'].endswith('.xlsx')]
         if not files:
-            print("No .json files found in the bucket 'ozonetell'. Please ensure JSON files are uploaded.")
+            print("No .xlsx files found in the configured COS bucket. Please ensure Excel files are uploaded.")
         return files
     except Exception as e:
         print(f"Error fetching COS files: {e}")
         return ["Error fetching COS files",e]
     
-files = get_cos_files()
+files = get_cos_files() or []
 # files = ["Error fetching COS files","Something Error"]
 # files = ["EWS LIG P4/Structure Work Tracker (31-05-2025).xlsx", "Eden/Structure Work Tracker (31-05-2025).xlsx", "Eligo/Structure Work Tracker (31-05-2025).xlsx", "Eligo/Tower G Finishing Tracker (01-06-2025).xlsx", "Eligo/Tower H Finishing Tracker (01-06-2025).xlsx", "Veridia/Structure Work Tracker (31-05-2025).xlsx", "Veridia/Tower 4 Finishing Tracker (13-05-2025).xlsx", "Veridia/Tower 5 Finishing Tracker (01-06-2025).xlsx", "Veridia/Tower 7 Finishing Tracker (01-06-2025).xlsx", "Wave City Club/Structure Work Tracker Wave City Club all Block (11-06-2025).xlsx"]
 # st.write(files)
@@ -153,7 +194,7 @@ def GetOverallreport(files):
         #VERIDIA TOWER 4
         for file in files:
             if file.startswith("Veridia") and "Tower 4 Finishing Tracker" in file:
-                response = cos_client.get_object(Bucket="projectreportnew", Key=file)
+                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
                 GetTower4Finishing(io.BytesIO(response['Body'].read()))
                 st.write(file,"✅")
                 
@@ -162,7 +203,7 @@ def GetOverallreport(files):
         for file in files:
             if file.startswith("Veridia") and "Tower 5 Finishing Tracker" in file:
                
-                response = cos_client.get_object(Bucket="projectreportnew", Key=file)
+                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
                 GetTower5Finishing(io.BytesIO(response['Body'].read()))
                 st.write(file,"✅")
 
@@ -170,34 +211,34 @@ def GetOverallreport(files):
         for file in files:
             if file.startswith("Veridia") and "Tower 7 Finishing Tracker" in file:
                
-                response = cos_client.get_object(Bucket="projectreportnew", Key=file)
+                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
                 GetTower7Finishing(io.BytesIO(response['Body'].read()))
                 st.write(file,"✅")
     
         # #ELIGO TOWER G
         for file in files:
             if file.startswith("Eligo") and "Tower G Finishing Tracker" in file:
-                response = cos_client.get_object(Bucket="projectreportnew", Key=file)
+                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
                 GetTowerGFinishing(io.BytesIO(response['Body'].read()))
                 st.write(file,"✅")
 
         #ELIGO TOWER H
         for file in files:
             if file.startswith("Eligo") and "Tower H Finishing Tracker" in file:
-                response = cos_client.get_object(Bucket="projectreportnew", Key=file)
+                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
                 GetTowerHFinishing(io.BytesIO(response['Body'].read()))
                 st.write(file,"✅")
 
         for file in files:
             if file.startswith("Eligo") and "Structure Work Tracker" in file:
-                response = cos_client.get_object(Bucket="projectreportnew", Key=file)
+                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
                 eligo = ProcessGandH(io.BytesIO(response['Body'].read()))
                 st.write(file,"✅")
 
         for file in files:
             #WAVE CITY
             if file.startswith("Wave City Club") and "Structure Work Tracker Wave City Club all Block" in file:
-                response = cos_client.get_object(Bucket="projectreportnew", Key=file)
+                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
                 wave = GetWaveCity(io.BytesIO(response['Body'].read()))
                 # st.write(wave)
                 st.write(file,"✅")
@@ -205,7 +246,7 @@ def GetOverallreport(files):
         # EWS LIG
         for file in files:
             if "EWS LIG" in file and "Structure Work Tracker" in file:
-                response = cos_client.get_object(Bucket="projectreportnew", Key=file)
+                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
                 ews_lig = ProcessEWSLIG(io.BytesIO(response['Body'].read()))
                 st.write(file,"✅")
 
@@ -214,7 +255,7 @@ def GetOverallreport(files):
         # #ELIGO TOWER STRUCTURE
         # for file in files:
         #     if file.startswith("Eligo") and "Structure Work Tracker" in file:
-        #         response = cos_client.get_object(Bucket="projectreportnew", Key=file)
+        #         response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
         #         eligo = ProcessGandH(io.BytesIO(response['Body'].read()))
         #         st.write(file,"✅")
 
@@ -222,7 +263,7 @@ def GetOverallreport(files):
         #EDEN
         for file in files:
              if file.startswith("Eden") and "Structure Work Tracker" in file:
-                response = cos_client.get_object(Bucket="projectreportnew", Key=file)
+                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
                 Eden = get_percentages(io.BytesIO(response['Body'].read()))
 
 
@@ -230,7 +271,7 @@ def GetOverallreport(files):
         # #VERIDIA TOWER 4
         for file in files:
             if file.startswith("Veridia") and "Structure Work Tracker" in file:
-                response = cos_client.get_object(Bucket="projectreportnew", Key=file)
+                response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
                 veridia = ProcessVeridia(io.BytesIO(response['Body'].read()))
                 # st.write(veridia)
                 st.write(file,"✅")
@@ -288,8 +329,10 @@ for key, month_files in project_map.items():
 st.header("OVERALL PROJECT REPORT")
 st.write(selected_files)
 
-if files[0] == "Error fetching COS files":
-    st.warning(files[1])    
+if files and files[0] == "Error fetching COS files":
+    st.warning(files[1])
+elif not files:
+    st.warning("No Excel files found in COS bucket.")
 else:
     st.session_state.overalldf = GetOverallreport(selected_files)
     st.session_state.overalldf = st.session_state.overalldf.drop_duplicates(subset='Tower Name')

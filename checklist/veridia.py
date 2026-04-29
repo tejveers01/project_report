@@ -46,7 +46,8 @@ COS_API_KEY = os.getenv("COS_API_KEY")
 COS_SERVICE_INSTANCE_ID = os.getenv("COS_SERVICE_INSTANCE_ID")
 COS_ENDPOINT = os.getenv("COS_ENDPOINT")
 COS_BUCKET = os.getenv("COS_BUCKET")
-
+EMAIL_ID = os.getenv("EMAIL_ID")
+PASSWORD = os.getenv("PASSWORD")
 # API Endpoints
 LOGIN_URL = "https://dms.asite.com/apilogin/"
 
@@ -2959,9 +2960,9 @@ st.markdown(
 # Show progress if data fetching is in progress
 show_progress()
 
-st.sidebar.title("Asite Initialization")
-email = st.sidebar.text_input("Email", "impwatson@gadieltechnologies.com", key="email_input")
-password = st.sidebar.text_input("Password", "Wave2026@123$", type="password", key="password_input")
+st.sidebar.title(" Asite Initialization")
+email = st.sidebar.text_input("Email", value=EMAIL_ID if EMAIL_ID else "" , key="email_input")
+password = st.sidebar.text_input("Password",  value=PASSWORD if PASSWORD else "" , type="password", key="password_input")
 
 if st.sidebar.button("Initialize and Fetch Data"):
     # Check if data is already fetched

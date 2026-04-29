@@ -1,6 +1,7 @@
 import io
 import streamlit as st
 import os
+import sys
 import json
 import logging
 import re
@@ -17,6 +18,16 @@ from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_t
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from typing import Tuple, Dict, Any
+
+# Paths for combined Streamlit app
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(CURRENT_DIR)
+
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+if CURRENT_DIR not in sys.path:
+    sys.path.insert(0, CURRENT_DIR)
 
 try:
     from dotenv import load_dotenv
@@ -38,20 +49,35 @@ except ModuleNotFoundError as exc:
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from root .env for local development
+ENV_PATH = os.path.join(ROOT_DIR, ".env")
+load_dotenv(dotenv_path=ENV_PATH, override=True)
+
+def get_secret(key, default=None):
+    """Read secrets from Streamlit Cloud first, then fallback to root .env/local env."""
+    try:
+        return st.secrets[key]
+    except Exception:
+        return os.getenv(key, default)
 
 # WatsonX configuration
-WATSONX_API_URL = os.getenv("WATSONX_API_URL")
-MODEL_ID = os.getenv("MODEL_ID")
-PROJECT_ID = os.getenv("PROJECT_ID")
-API_KEY = os.getenv("API_KEY")
+WATSONX_API_URL = get_secret("WATSONX_API_URL")
+MODEL_ID = get_secret("MODEL_ID")
+PROJECT_ID = get_secret("PROJECT_ID")
+API_KEY = get_secret("API_KEY")
+EMAIL_ID = get_secret("EMAIL_ID")
+PASSWORD = get_secret("PASSWORD")
 
 # Check environment variables
 if not all([API_KEY, WATSONX_API_URL, MODEL_ID, PROJECT_ID]):
-    st.error("❌ Missing environment variables. Please set API_KEY, WATSONX_API_URL, MODEL_ID, and PROJECT_ID in your .env file.")
-    st.markdown("**Setup Instructions**:\n1. Create a `.env` file with the following:\n```\nAPI_KEY=your_api_key\nWATSONX_API_URL=your_url\nMODEL_ID=your_model_id\nPROJECT_ID=your_project_id\n```\n2. Restart the application.")
-    logger.error("Missing one or more required environment variables")
+    st.error("❌ Missing environment variables: API_KEY, WATSONX_API_URL, MODEL_ID, or PROJECT_ID.")
+    st.info("For local use, keep them in root `.env`. For Streamlit Cloud, add them in Secrets.")
+    logger.error("Missing one or more required WatsonX environment variables")
+    st.stop()
+
+if not all([EMAIL_ID, PASSWORD]):
+    st.error("❌ Missing EMAIL_ID or PASSWORD in root `.env` / Streamlit Secrets.")
+    logger.error("Missing Asite login credentials")
     st.stop()
 
 # Disable SSL warnings
@@ -231,11 +257,12 @@ if "housekeeping_df" not in st.session_state:
 if "session_id" not in st.session_state:
     st.session_state["session_id"] = None
 
-st.sidebar.title("🔒 Asite Login")
-email = st.sidebar.text_input("Email", "impwatson@gadieltechnologies.com", key="email_input")
-password = st.sidebar.text_input("Password", "Wave2026@123$", type="password", key="password_input")
-if st.sidebar.button("Login", key="login_button"):
-    session_id = login_to_asite(email, password)
+st.sidebar.title("🔒 Asite Initialization")
+
+if st.session_state.get("session_id"):
+    st.sidebar.success("✅ Asite session active")
+elif st.sidebar.button("Login", key="login_button"):
+    session_id = login_to_asite(EMAIL_ID, PASSWORD)
     if session_id:
         st.session_state["session_id"] = session_id
         st.sidebar.success("✅ Login Successful")
@@ -243,7 +270,7 @@ if st.sidebar.button("Login", key="login_button"):
 # Data Fetch Section (unchanged)
 st.sidebar.title("📂 Project Data")
 project_name, form_name, project_options = project_dropdown()
-if "session_id" in st.session_state:
+if st.session_state.get("session_id"):
     if st.sidebar.button("Fetch Data", key="fetch_data"):
         header, data, payload = fetch_project_data(st.session_state["session_id"], project_name, form_name)
         st.json(header)

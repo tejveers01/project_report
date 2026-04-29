@@ -66,6 +66,8 @@ MODEL_ID = os.getenv("MODEL_ID_1")
 PROJECT_ID = os.getenv("PROJECT_ID_1")
 API_KEY = os.getenv("API_KEY_1")
 
+EMAIL_ID = os.getenv("EMAIL_ID")
+PASSWORD = os.getenv("PASSWORD")
 # API Endpoints
 LOGIN_URL = "https://dms.asite.com/apilogin/"
 IAM_TOKEN_URL = "https://iam.cloud.ibm.com/identity/token"
@@ -2252,9 +2254,9 @@ st.markdown(
 )
 
 # Initialize and Fetch Data
-st.sidebar.title("🔒 Asite Initialization")
-email = st.sidebar.text_input("Email", "impwatson@gadieltechnologies.com", key="email_input")
-password = st.sidebar.text_input("Password", "Wave2026@123$", type="password", key="password_input")
+st.sidebar.title(" Asite Initialization")
+email = st.sidebar.text_input("Email", value=EMAIL_ID if EMAIL_ID else "" , key="email_input")
+password = st.sidebar.text_input("Password",  value=PASSWORD if PASSWORD else "" , type="password", key="password_input")
 
 if st.sidebar.button("Initialize and Fetch Data"):
     loop = asyncio.new_event_loop()
