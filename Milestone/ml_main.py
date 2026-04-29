@@ -8,15 +8,6 @@ from datetime import datetime
 import glob
 import traceback
 
-# Absolute paths so this file works when called from root app.py via runpy
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(CURRENT_DIR)
-
-if CURRENT_DIR not in sys.path:
-    sys.path.insert(0, CURRENT_DIR)
-if ROOT_DIR not in sys.path:
-    sys.path.insert(0, ROOT_DIR)
-
 try:
     import psutil
 except ModuleNotFoundError as exc:
@@ -415,62 +406,62 @@ if 'messages' not in st.session_state:
     st.session_state.selected_project = None
     st.session_state.report_file = None
 
-# Project configurations - uses absolute paths so scripts run correctly from the Milestone folder
+# Project configurations - Enhanced with better debugging
 PROJECTS = {
     'Veridia': {
-        'script': os.path.join(CURRENT_DIR, 'veridia.py'),
+        'script': 'veridia.py',
         'display_name': 'Veridia',
         'icon': '🌿',
         'patterns': [
-            os.path.join(CURRENT_DIR, 'Time_Delivery_Milestones_Report_*.xlsx'),
-            os.path.join(CURRENT_DIR, '*Veridia*.xlsx'),
-            os.path.join(CURRENT_DIR, 'Veridia_*.xlsx'),
-            os.path.join(CURRENT_DIR, '*veridia*.xlsx'),
-        ],
+            'Time_Delivery_Milestones_Report_*.xlsx',
+            '*Veridia*.xlsx',
+            'Veridia_*.xlsx',
+            '*veridia*.xlsx'
+        ]
     },
     'Eligo': {
-        'script': os.path.join(CURRENT_DIR, 'eligo.py'),
+        'script': 'eligo.py', 
         'display_name': 'Eligo',
         'icon': '⚡',
         'patterns': [
-            os.path.join(CURRENT_DIR, '*Eligo*.xlsx'),
-            os.path.join(CURRENT_DIR, 'Eligo_*.xlsx'),
-            os.path.join(CURRENT_DIR, '*eligo*.xlsx'),
-        ],
+            '*Eligo*.xlsx',
+            'Eligo_*.xlsx',
+            '*eligo*.xlsx'
+        ]
     },
     'EWS-LIG': {
-        'script': os.path.join(CURRENT_DIR, 'ews-lig.py'),
+        'script': 'ews-lig.py',
         'display_name': 'EWS-LIG',
         'icon': '🔍',
         'patterns': [
-            os.path.join(CURRENT_DIR, '*EWS*LIG*.xlsx'),
-            os.path.join(CURRENT_DIR, '*EWS-LIG*.xlsx'),
-            os.path.join(CURRENT_DIR, 'EWS_LIG_*.xlsx'),
-            os.path.join(CURRENT_DIR, '*ews*lig*.xlsx'),
-        ],
+            '*EWS*LIG*.xlsx',
+            '*EWS-LIG*.xlsx',
+            'EWS_LIG_*.xlsx',
+            '*ews*lig*.xlsx'
+        ]
     },
     'WaveCityClub': {
-        'script': os.path.join(CURRENT_DIR, 'wavecityclub.py'),
+        'script': 'wavecityclub.py',
         'display_name': 'WaveCityClub',
         'icon': '🌊',
         'patterns': [
-            os.path.join(CURRENT_DIR, 'Wave_City_Club_Report_*.xlsx'),
-            os.path.join(CURRENT_DIR, '*WaveCityClub*.xlsx'),
-            os.path.join(CURRENT_DIR, '*Wave*City*Club*.xlsx'),
-            os.path.join(CURRENT_DIR, '*wavecityclub*.xlsx'),
-        ],
+            'Wave_City_Club_Report_*.xlsx',
+            '*WaveCityClub*.xlsx',
+            '*Wave*City*Club*.xlsx',
+            '*wavecityclub*.xlsx'
+        ]
     },
     'Eden': {
-        'script': os.path.join(CURRENT_DIR, 'eden.py'),
+        'script': 'eden.py',
         'display_name': 'Eden',
         'icon': '🏡',
         'patterns': [
-            os.path.join(CURRENT_DIR, 'Eden_KRA_Milestone_Report_*.xlsx'),
-            os.path.join(CURRENT_DIR, '*Eden*.xlsx'),
-            os.path.join(CURRENT_DIR, 'Eden_*.xlsx'),
-            os.path.join(CURRENT_DIR, '*eden*.xlsx'),
-        ],
-    },
+            'Eden_KRA_Milestone_Report_*.xlsx',
+            '*Eden*.xlsx',
+            'Eden_*.xlsx',
+            '*eden*.xlsx'
+        ]
+    }
 }
 
 def cleanup_resources():
@@ -507,7 +498,7 @@ def cleanup_resources():
         cleaned_files = 0
         
         for pattern in temp_patterns:
-            for file in glob.glob(os.path.join(CURRENT_DIR, pattern)):
+            for file in glob.glob(pattern):
                 try:
                     if os.path.isfile(file):
                         os.remove(file)
@@ -582,7 +573,7 @@ def find_generated_file(project_config, project_name):
                 st.write(f"⏰ File found but too old: {latest_file}")
 
     # Check for any new Excel files created/modified
-    all_excel = glob.glob(os.path.join(CURRENT_DIR, "*.xlsx"))
+    all_excel = glob.glob("*.xlsx")
     if all_excel:
         latest_new_file = max(all_excel, key=os.path.getmtime)
         file_time = os.path.getmtime(latest_new_file)
@@ -627,18 +618,18 @@ def run_project_script(project_name):
         # Enhanced debugging information
         st.write(f"🔧 **Debug Information for {project_name}:**")
         st.write(f"📝 Script path: {script_path}")
-        st.write(f"📁 Milestone directory: {CURRENT_DIR}")
+        st.write(f"📁 Current directory: {os.getcwd()}")
         st.write(f"🐍 Python executable: {sys.executable}")
         
         # Check if script file exists
         if not os.path.exists(script_path):
-            available_files = [f for f in os.listdir(CURRENT_DIR) if f.endswith('.py')]
+            available_files = [f for f in os.listdir('.') if f.endswith('.py')]
             return False, f"❌ Script file '{script_path}' not found in current directory.\n\nAvailable Python files: {available_files}"
         
         st.write(f"✅ Script file found: {script_path}")
         
         # Store existing Excel files before execution
-        files_before = set(glob.glob(os.path.join(CURRENT_DIR, "*.xlsx")))
+        files_before = set(glob.glob("*.xlsx"))
         st.write(f"📊 Excel files before execution: {len(files_before)}")
         
         # Enhanced timeout settings
@@ -676,7 +667,7 @@ def run_project_script(project_name):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            cwd=CURRENT_DIR,
+            cwd=os.getcwd(),
             env=env,
             bufsize=1,
             universal_newlines=True
@@ -727,7 +718,7 @@ def run_project_script(project_name):
 
 **To debug manually:**
 ```bash
-cd {CURRENT_DIR}
+cd {os.getcwd()}
 python {script_path}
 ```
 
@@ -762,7 +753,7 @@ STDERR: {stderr}
             return False, f"❌ Script execution failed with return code {process.returncode}.\n\nDetails:\n{error_details}"
         
         # Check for new files after execution
-        files_after = set(glob.glob(os.path.join(CURRENT_DIR, "*.xlsx")))
+        files_after = set(glob.glob("*.xlsx"))
         new_files = files_after - files_before
         st.write(f"📊 Excel files after execution: {len(files_after)} (New: {len(new_files)})")
         
@@ -778,7 +769,7 @@ STDERR: {stderr}
             return True, generated_file
         
         # Diagnostic information if file not found
-        all_excel = glob.glob(os.path.join(CURRENT_DIR, "*.xlsx"))
+        all_excel = glob.glob("*.xlsx")
         error_msg = f"""
 ❌ **Report file not found after script execution.**
 
