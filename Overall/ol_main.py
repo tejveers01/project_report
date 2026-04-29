@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import sys
+import importlib.util
 from pathlib import Path
 
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -16,6 +17,15 @@ try:
     load_dotenv(ROOT_DIR / ".env", override=True)
 except Exception:
     pass
+
+def load_local_module(module_name):
+    module_path = CURRENT_DIR / f"{module_name}.py"
+    spec = importlib.util.spec_from_file_location(f"overall_{module_name}", module_path)
+    if spec is None or spec.loader is None:
+        raise ModuleNotFoundError(module_name)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 def get_config_value(key, default=None):
     """Read config from Streamlit secrets first, then root .env / environment."""
@@ -49,12 +59,12 @@ from dateutil.relativedelta import relativedelta
 try:
     import ibm_boto3
     from ibm_botocore.client import Config
-    from EWS_LIG import *
-    from Tower_G_and_H import *
-    from Veridia import *
-    from Wavecity import *
-    from Finishing import *
-    from Eden import *
+    EWS_LIG = load_local_module("EWS_LIG")
+    Tower_G_and_H = load_local_module("Tower_G_and_H")
+    Veridia = load_local_module("Veridia")
+    Wavecity = load_local_module("Wavecity")
+    Finishing = load_local_module("Finishing")
+    Eden = load_local_module("Eden")
     from Fileformat import *
 except ModuleNotFoundError as exc:
     st.error(
@@ -188,14 +198,14 @@ def GetOverallreport(files):
         ews_lig = {}
         veridia = {}
         eligo = {}
-        Eden = {}
+        eden_data = {}
         wave = {}
 
         #VERIDIA TOWER 4
         for file in files:
             if file.startswith("Veridia") and "Tower 4 Finishing Tracker" in file:
                 response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                GetTower4Finishing(io.BytesIO(response['Body'].read()))
+                Finishing.GetTower4Finishing(io.BytesIO(response['Body'].read()))
                 st.write(file,"✅")
                 
 
@@ -204,7 +214,7 @@ def GetOverallreport(files):
             if file.startswith("Veridia") and "Tower 5 Finishing Tracker" in file:
                
                 response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                GetTower5Finishing(io.BytesIO(response['Body'].read()))
+                Finishing.GetTower5Finishing(io.BytesIO(response['Body'].read()))
                 st.write(file,"✅")
 
         #VERIDIA TOWER 7
@@ -212,34 +222,34 @@ def GetOverallreport(files):
             if file.startswith("Veridia") and "Tower 7 Finishing Tracker" in file:
                
                 response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                GetTower7Finishing(io.BytesIO(response['Body'].read()))
+                Finishing.GetTower7Finishing(io.BytesIO(response['Body'].read()))
                 st.write(file,"✅")
     
         # #ELIGO TOWER G
         for file in files:
             if file.startswith("Eligo") and "Tower G Finishing Tracker" in file:
                 response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                GetTowerGFinishing(io.BytesIO(response['Body'].read()))
+                Finishing.GetTowerGFinishing(io.BytesIO(response['Body'].read()))
                 st.write(file,"✅")
 
         #ELIGO TOWER H
         for file in files:
             if file.startswith("Eligo") and "Tower H Finishing Tracker" in file:
                 response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                GetTowerHFinishing(io.BytesIO(response['Body'].read()))
+                Finishing.GetTowerHFinishing(io.BytesIO(response['Body'].read()))
                 st.write(file,"✅")
 
         for file in files:
             if file.startswith("Eligo") and "Structure Work Tracker" in file:
                 response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                eligo = ProcessGandH(io.BytesIO(response['Body'].read()))
+                eligo = Tower_G_and_H.ProcessGandH(io.BytesIO(response['Body'].read()))
                 st.write(file,"✅")
 
         for file in files:
             #WAVE CITY
             if file.startswith("Wave City Club") and "Structure Work Tracker Wave City Club all Block" in file:
                 response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                wave = GetWaveCity(io.BytesIO(response['Body'].read()))
+                wave = Wavecity.GetWaveCity(io.BytesIO(response['Body'].read()))
                 # st.write(wave)
                 st.write(file,"✅")
 
@@ -247,7 +257,7 @@ def GetOverallreport(files):
         for file in files:
             if "EWS LIG" in file and "Structure Work Tracker" in file:
                 response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                ews_lig = ProcessEWSLIG(io.BytesIO(response['Body'].read()))
+                ews_lig = EWS_LIG.ProcessEWSLIG(io.BytesIO(response['Body'].read()))
                 st.write(file,"✅")
 
     
@@ -264,7 +274,7 @@ def GetOverallreport(files):
         for file in files:
              if file.startswith("Eden") and "Structure Work Tracker" in file:
                 response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                Eden = get_percentages(io.BytesIO(response['Body'].read()))
+                eden_data = Eden.get_percentages(io.BytesIO(response['Body'].read()))
 
 
        
@@ -272,7 +282,7 @@ def GetOverallreport(files):
         for file in files:
             if file.startswith("Veridia") and "Structure Work Tracker" in file:
                 response = cos_client.get_object(Bucket=COS_BUCKET, Key=file)
-                veridia = ProcessVeridia(io.BytesIO(response['Body'].read()))
+                veridia = Veridia.ProcessVeridia(io.BytesIO(response['Body'].read()))
                 # st.write(veridia)
                 st.write(file,"✅")
 
@@ -281,7 +291,7 @@ def GetOverallreport(files):
 
         combined_data = []
 
-        for data in [ews_lig, veridia, eligo, Eden, wave]:
+        for data in [ews_lig, veridia, eligo, eden_data, wave]:
             if isinstance(data, list):
                 # Check if it's a list of dicts (most typical for DataFrame input)
                 if all(isinstance(item, dict) for item in data):

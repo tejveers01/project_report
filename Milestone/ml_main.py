@@ -8,6 +8,10 @@ from datetime import datetime
 import glob
 import traceback
 
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+if CURRENT_DIR not in sys.path:
+    sys.path.insert(0, CURRENT_DIR)
+
 try:
     import psutil
 except ModuleNotFoundError as exc:
@@ -19,12 +23,16 @@ except ModuleNotFoundError as exc:
     st.stop()
 
 # Page configuration
-st.set_page_config(
-    page_title="Milestone Report Generator",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+# When this file is launched from the main app.py, page config may already be set.
+try:
+    st.set_page_config(
+        page_title="Milestone Report Generator",
+        page_icon="📊",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+except Exception:
+    pass
 
 # Enhanced Custom CSS for modern, visually appealing interface
 st.markdown("""
@@ -557,8 +565,9 @@ def find_generated_file(project_config, project_name):
     patterns = project_config['patterns']
     
     for pattern in patterns:
-        st.write(f"🔍 Searching with pattern: {pattern}")
-        matches = glob.glob(pattern)
+        search_pattern = pattern if os.path.isabs(pattern) else os.path.join(CURRENT_DIR, pattern)
+        st.write(f"🔍 Searching with pattern: {search_pattern}")
+        matches = glob.glob(search_pattern)
         if matches:
             # Get the most recent file
             latest_file = max(matches, key=os.path.getmtime)
@@ -573,7 +582,7 @@ def find_generated_file(project_config, project_name):
                 st.write(f"⏰ File found but too old: {latest_file}")
 
     # Check for any new Excel files created/modified
-    all_excel = glob.glob("*.xlsx")
+    all_excel = glob.glob(os.path.join(CURRENT_DIR, "*.xlsx"))
     if all_excel:
         latest_new_file = max(all_excel, key=os.path.getmtime)
         file_time = os.path.getmtime(latest_new_file)
@@ -611,6 +620,8 @@ def run_project_script(project_name):
     try:
         project_config = PROJECTS[project_name]
         script_path = project_config['script']
+        if not os.path.isabs(script_path):
+            script_path = os.path.join(CURRENT_DIR, script_path)
         
         # Show system status before execution
         memory_before = monitor_memory_during_execution()
@@ -618,18 +629,19 @@ def run_project_script(project_name):
         # Enhanced debugging information
         st.write(f"🔧 **Debug Information for {project_name}:**")
         st.write(f"📝 Script path: {script_path}")
-        st.write(f"📁 Current directory: {os.getcwd()}")
+        st.write(f"📁 App root directory: {os.getcwd()}")
+        st.write(f"📁 Milestone directory: {CURRENT_DIR}")
         st.write(f"🐍 Python executable: {sys.executable}")
         
         # Check if script file exists
         if not os.path.exists(script_path):
-            available_files = [f for f in os.listdir('.') if f.endswith('.py')]
+            available_files = [f for f in os.listdir(CURRENT_DIR) if f.endswith('.py')]
             return False, f"❌ Script file '{script_path}' not found in current directory.\n\nAvailable Python files: {available_files}"
         
         st.write(f"✅ Script file found: {script_path}")
         
         # Store existing Excel files before execution
-        files_before = set(glob.glob("*.xlsx"))
+        files_before = set(glob.glob(os.path.join(CURRENT_DIR, "*.xlsx")))
         st.write(f"📊 Excel files before execution: {len(files_before)}")
         
         # Enhanced timeout settings
@@ -667,7 +679,7 @@ def run_project_script(project_name):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            cwd=os.getcwd(),
+            cwd=CURRENT_DIR,
             env=env,
             bufsize=1,
             universal_newlines=True
@@ -718,7 +730,7 @@ def run_project_script(project_name):
 
 **To debug manually:**
 ```bash
-cd {os.getcwd()}
+cd {CURRENT_DIR}
 python {script_path}
 ```
 
@@ -753,7 +765,7 @@ STDERR: {stderr}
             return False, f"❌ Script execution failed with return code {process.returncode}.\n\nDetails:\n{error_details}"
         
         # Check for new files after execution
-        files_after = set(glob.glob("*.xlsx"))
+        files_after = set(glob.glob(os.path.join(CURRENT_DIR, "*.xlsx")))
         new_files = files_after - files_before
         st.write(f"📊 Excel files after execution: {len(files_after)} (New: {len(new_files)})")
         
@@ -769,7 +781,7 @@ STDERR: {stderr}
             return True, generated_file
         
         # Diagnostic information if file not found
-        all_excel = glob.glob("*.xlsx")
+        all_excel = glob.glob(os.path.join(CURRENT_DIR, "*.xlsx"))
         error_msg = f"""
 ❌ **Report file not found after script execution.**
 
