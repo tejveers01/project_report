@@ -30,8 +30,21 @@ if CURRENT_DIR not in sys.path:
     sys.path.insert(0, CURRENT_DIR)
 
 from env_loader import load_root_env
+from shared_ui import inject_shared_ui, render_app_header
 
 load_root_env()
+
+try:
+    st.set_page_config(
+        page_title="NCR Report",
+        page_icon="📊",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+except Exception:
+    pass
+
+inject_shared_ui()
 
 try:
     from Veridiaa_new import *
@@ -244,7 +257,21 @@ def project_dropdown():
 
 
 
-st.title("NCR Safety Housekeeping Reports")
+render_app_header(
+    "NCR Safety Housekeeping Reports",
+    "Fetch Asite data, review safety and housekeeping NCRs, and generate consolidated outputs from one unified screen.",
+    "NCR Workspace",
+)
+
+st.markdown(
+    """
+    <div class="section-card">
+        <h3>Workflow</h3>
+        <p>Start from the sidebar to initialize Asite, fetch project data, and then generate the report combination you need.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # Initialize session state (unchanged)
 if "ncr_df" not in st.session_state:

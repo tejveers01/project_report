@@ -14,8 +14,21 @@ if CURRENT_DIR not in sys.path:
     sys.path.insert(0, CURRENT_DIR)
 
 from env_loader import load_root_env
+from shared_ui import inject_shared_ui, render_app_header
 
 load_root_env()
+
+try:
+    st.set_page_config(
+        page_title="Checklist Report",
+        page_icon="📝",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+except Exception:
+    pass
+
+inject_shared_ui()
 
 CHECKLIST_PAGES = {
     "EDEN": "eden.py",
@@ -25,12 +38,31 @@ CHECKLIST_PAGES = {
     "Veridia": "veridia.py",
 }
 
-st.sidebar.title("Projects")
+st.sidebar.markdown(
+    "<h2 style='color:#000000; margin-bottom:0.4rem;'>Checklist Modules</h2>",
+    unsafe_allow_html=True,
+)
 
 selected_page = st.sidebar.radio(
     "Select Checklist Project",
     list(CHECKLIST_PAGES.keys()),
     key="checklist_project_selector"
+)
+
+render_app_header(
+    "Checklist Report",
+    "Move between checklist modules from one consistent workspace and keep the project review flow simple.",
+    "Checklist Control",
+)
+
+st.markdown(
+    f"""
+    <div class="section-card">
+        <h3>Active Module</h3>
+        <p><strong>{selected_page}</strong> is loaded below. Use the left sidebar to switch between checklist report flows.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
 file_name = CHECKLIST_PAGES[selected_page]

@@ -1416,7 +1416,7 @@ def format_chunk_locally(chunk, chunk_idx, chunk_size, dataset_name, location_df
         for name, count in sorted(activity_dict.items()):
             output += f"{name:<30} {count}\n"
             total_activities += count
-    
+
     output += f"Total Completed Activities: {total_activities}"
     return output
 
@@ -2954,14 +2954,12 @@ def display_activity_count():
         
 st.markdown(
     """
-    <h1 style='font-family: "Arial Black", Gadget, sans-serif; 
-               color: red; 
-               font-size: 48px; 
-               text-align: center;'>
-        CheckList - Report
-    </h1>
+    <div class="section-card">
+        <h3>Veridia Checklist</h3>
+        <p>Initialize the Veridia sources, inspect checklist counts, and generate the consolidated output with the updated shared UI.</p>
+    </div>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 # Show progress if data fetching is in progress

@@ -29,6 +29,11 @@ if ROOT_DIR not in sys.path:
 
 from env_loader import load_root_env
 
+
+def debug_ui(*args, **kwargs):
+    """Silent helper for temporary debug output removed from the UI."""
+    return None
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -138,9 +143,7 @@ async def GetWorkspaceID():
         raise Exception(f"Failed to fetch workspace list: {response.status_code}")
     try:
         data = response.json()
-        st.write(f"Workspace list response: {data}")
         st.session_state.workspaceid = data['asiteDataList']['workspaceVO'][2]['Workspace_Id']
-        st.write(f"Workspace ID: {st.session_state.workspaceid}")
     except (KeyError, IndexError) as e:
         st.error(f"Error parsing workspace ID: {str(e)}")
         raise
@@ -158,12 +161,10 @@ async def GetProjectId():
         st.error(f"Failed to fetch project IDs: {response.status_code} - {response.text}")
         raise Exception(f"Failed to fetch project IDs: {response.status_code}")
     data = response.json()
-    st.write(f"Project ID response: {data}")
     if not data.get('data'):
         st.error("No quality plans found for the specified date.")
         raise Exception("No quality plans found")
     st.session_state.Eden_structure = data['data'][0]['planId']
-    st.write(f"Eden Structure Project ID: {st.session_state.Eden_structure}")
 
 # Asynchronous Fetch Function
 async def fetch_data(session, url, headers):
@@ -183,20 +184,17 @@ async def GetAllDatas():
 
     async with aiohttp.ClientSession() as session:
         start_record = 1
-        st.write("Fetching Eden Structure data...")
         while True:
             url = f"https://adoddleak.asite.com/commonapi/qaplan/getPlanAssociation/?projectId={st.session_state.workspaceid}&planId={st.session_state.Eden_structure}&recordStart={start_record}&recordLimit={record_limit}"
             try:
                 async with session.get(url, headers=headers) as response:
                     if response.status == 204:
-                        st.write("No more Structure data available (204)")
                         break
                     data = await response.json()
                     if 'associationList' in data and data['associationList']:
                         all_structure_data.extend(data['associationList'])
                     else:
                         all_structure_data.extend(data if isinstance(data, list) else [])
-                    st.write(f"Fetched {len(all_structure_data[-record_limit:])} Structure records (Total: {len(all_structure_data)})")
                     if len(all_structure_data[-record_limit:]) < record_limit:
                         break
                     start_record += record_limit
@@ -220,10 +218,6 @@ async def GetAllDatas():
 
     eden_structure = df_structure[desired_columns]
 
-    st.write(f"EDEN STRUCTURE ({', '.join(desired_columns)})")
-    st.write(f"Total records: {len(eden_structure)}")
-    st.write(eden_structure)
-    
     return eden_structure
 
 # Fetch Activity Data
@@ -239,19 +233,16 @@ async def Get_Activity():
     
     async with aiohttp.ClientSession() as session:
         start_record = 1
-        st.write("Fetching Activity data for Eden Structure...")
         while True:
             url = f"https://adoddleak.asite.com/commonapi/qaplan/getPlanActivities/?projectId={st.session_state.workspaceid}&planId={st.session_state.Eden_structure}&recordStart={start_record}&recordLimit={record_limit}"
             try:
                 data = await fetch_data(session, url, headers)
                 if data is None:
-                    st.write("No more Structure Activity data available (204)")
                     break
                 if 'activityList' in data and data['activityList']:
                     all_structure_activity_data.extend(data['activityList'])
                 else:
                     all_structure_activity_data.extend(data if isinstance(data, list) else [])
-                st.write(f"Fetched {len(all_structure_activity_data[-record_limit:])} Structure Activity records (Total: {len(all_structure_activity_data)})")
                 if len(all_structure_activity_data[-record_limit:]) < record_limit:
                     break
                 start_record += record_limit
@@ -261,10 +252,6 @@ async def Get_Activity():
  
     structure_activity_data = pd.DataFrame(all_structure_activity_data)[['activityName', 'activitySeq', 'formTypeId']]
 
-    st.write("EDEN STRUCTURE ACTIVITY DATA (activityName and activitySeq)")
-    st.write(f"Total records: {len(structure_activity_data)}")
-    st.write(structure_activity_data)
-      
     return structure_activity_data
 
 # Fetch Location/Module Data
@@ -281,26 +268,22 @@ async def Get_Location():
     async with aiohttp.ClientSession() as session:
         start_record = 1
         total_records_fetched = 0
-        st.write("Fetching Eden Structure Location/Module data...")
         while True:
             url = f"https://adoddleak.asite.com/commonapi/qaplan/getPlanLocation/?projectId={st.session_state.workspaceid}&planId={st.session_state.Eden_structure}&recordStart={start_record}&recordLimit={record_limit}"
             try:
                 data = await fetch_data(session, url, headers)
                 if data is None:
-                    st.write("No more Structure Location data available (204)")
                     break
                 if isinstance(data, list):
                     location_data = [{'qiLocationId': item.get('qiLocationId', ''), 'qiParentId': item.get('qiParentId', ''), 'name': item.get('name', '')} 
                                    for item in data if isinstance(item, dict)]
                     all_structure_location_data.extend(location_data)
                     total_records_fetched = len(all_structure_location_data)
-                    st.write(f"Fetched {len(location_data)} Structure Location records (Total: {total_records_fetched})")
                 elif isinstance(data, dict) and 'locationList' in data and data['locationList']:
                     location_data = [{'qiLocationId': loc.get('qiLocationId', ''), 'qiParentId': loc.get('qiParentId', ''), 'name': loc.get('name', '')} 
                                    for loc in data['locationList']]
                     all_structure_location_data.extend(location_data)
                     total_records_fetched = len(all_structure_location_data)
-                    st.write(f"Fetched {len(location_data)} Structure Location records (Total: {total_records_fetched})")
                 else:
                     st.warning(f"No 'locationList' in Structure Location data or empty list.")
                     break
@@ -316,10 +299,6 @@ async def Get_Location():
     if 'name' in structure_df.columns and structure_df['name'].isna().all():
         st.error("❌ All 'name' values in Structure Location data are missing or empty!")
 
-    st.write("EDEN STRUCTURE LOCATION/MODULE DATA")
-    st.write(f"Total records: {len(structure_df)}")
-    st.write(structure_df)
-    
     st.session_state.structure_location_data = structure_df
     
     return structure_df
@@ -495,7 +474,7 @@ def format_chunk_locally(chunk, chunk_idx, chunk_size, dataset_name, location_df
         for name, count in sorted(activity_dict.items()):
             output += f"{name:<30} {count}\n"
             total_activities += count
-    
+
     output += f"Total Completed Activities: {total_activities}"
     return output
 
@@ -692,7 +671,7 @@ def AnalyzeStatusManually(email=None, password=None):
     st.session_state.structure_analysis = structure_analysis
 
     end_time = time.time()
-    st.write(f"Total execution time: {end_time - start_time:.2f} seconds")
+    logger.info("Eden checklist analysis completed in %.2f seconds", end_time - start_time)
 
 def get_cos_files():
     try:
@@ -1559,40 +1538,28 @@ async def initialize_and_fetch_data(email, password):
             if file_key:
                 st.success(f"Found 1 file in COS storage: {file_key}")
                 try:
-                    st.write(f"Processing file: {file_key}")
                     cos_client = initialize_cos_client()
                     if not cos_client:
                         st.error("Failed to initialize COS client during file fetch")
                         logger.error("COS client initialization failed during file fetch")
                         return False
-                    st.write("Fetching file from COS...")
                     response = cos_client.get_object(Bucket=COS_BUCKET, Key=file_key)
                     file_bytes = io.BytesIO(response['Body'].read())
-                    st.write("File fetched successfully. Processing sheets...")
                     results = process_file(file_bytes, file_key)
-                    st.write(f"Processing results: {len(results)} sheets processed")
                     for df, tname in results:
                         if df is not None:
                             if "Tower 4" in tname:
                                 st.session_state.cos_df_tower4 = df
                                 st.session_state.cos_tname_tower4 = tname
-                                st.write(f"Processed Data for {tname} - {len(df)} rows:")
-                                st.write(df.head())
                             elif "Tower 5" in tname:
                                 st.session_state.cos_df_tower5 = df
                                 st.session_state.cos_tname_tower5 = tname
-                                st.write(f"Processed Data for {tname} - {len(df)} rows:")
-                                st.write(df.head())
                             elif "Tower 6" in tname:
                                 st.session_state.cos_df_tower6 = df
                                 st.session_state.cos_tname_tower6 = tname
-                                st.write(f"Processed Data for {tname} - {len(df)} rows:")
-                                st.write(df.head())
                             elif "Tower 7" in tname:
                                 st.session_state.cos_df_tower7 = df
                                 st.session_state.cos_tname_tower7 = tname
-                                st.write(f"Processed Data for {tname} - {len(df)} rows:")
-                                st.write(df.head())
                         else:
                             st.warning(f"No data processed for {tname} in {file_key}.")
                 except Exception as e:
@@ -2158,7 +2125,6 @@ def run_analysis_and_display():
         st.success("Activity counts displayed successfully!")
 
         # Step 2: Check AI data totals
-        st.write("Checking AI data totals...")
         logger.info(f"st.session_state.ai_response contents: {st.session_state.ai_response}")
         if not st.session_state.ai_response:
             st.error("❌ No AI data available in st.session_state.ai_response. Attempting to regenerate.")
@@ -2171,7 +2137,6 @@ def run_analysis_and_display():
                 return
 
         # Step 3: Generate consolidated checklist Excel file
-        st.write("Generating consolidated checklist Excel file...")
         structure_analysis = st.session_state.get('structure_analysis', None)
         if structure_analysis is None:
             st.error("❌ No structure analysis data available. Please ensure analysis ran successfully.")
@@ -2207,14 +2172,12 @@ def run_analysis_and_display():
 # Streamlit UI
 st.markdown(
     """
-    <h1 style='font-family: "Arial Black", Gadget, sans-serif; 
-               color: red; 
-               font-size: 48px; 
-               text-align: center;'>
-        Eden CheckList - Report
-    </h1>
+    <div class="section-card">
+        <h3>Eden Checklist</h3>
+        <p>Initialize Asite and COS data, then analyze and export the Eden checklist output from the same shared workspace.</p>
+    </div>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 # Initialize and Fetch Data

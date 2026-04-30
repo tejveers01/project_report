@@ -13,8 +13,21 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from env_loader import load_root_env
+from shared_ui import inject_shared_ui, render_app_header
 
 load_root_env()
+
+try:
+    st.set_page_config(
+        page_title="Overall Report",
+        page_icon="📑",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+except Exception:
+    pass
+
+inject_shared_ui()
 
 def load_local_module(module_name):
     module_path = CURRENT_DIR / f"{module_name}.py"
@@ -360,7 +373,21 @@ for key, month_files in project_map.items():
         selected_files.extend(month_files["previous"])
 
 
-st.header("OVERALL PROJECT REPORT")
+render_app_header(
+    "Overall Project Report",
+    "Combine current project trackers into one consolidated status view with a consistent reporting shell.",
+    "Portfolio View",
+)
+
+st.markdown(
+    """
+    <div class="section-card">
+        <h3>Current Output</h3>
+        <p>The table below assembles the latest available project trackers and prepares them for download as a single overall report.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 if files and files[0] == "Error fetching COS files":
     st.warning(files[1])
@@ -372,7 +399,7 @@ else:
     st.session_state.check = True
     if st.session_state.check:
         if st.session_state.overalldf is not None and not st.session_state.overalldf.empty:
-            st.title("Tower Project Status Table")
+            st.subheader("Tower Project Status Table")
             st.dataframe(st.session_state.overalldf)
         # st.write(df)
             excel_data = to_excel(st.session_state.overalldf)

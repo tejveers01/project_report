@@ -36,6 +36,11 @@ if ROOT_DIR not in sys.path:
 
 from env_loader import load_root_env
 
+
+def debug_ui(*args, **kwargs):
+    """Silent helper for temporary debug output removed from the UI."""
+    return None
+
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -203,13 +208,6 @@ async def GetProjectId():
             st.error(" No project data found in GetProjectId response")
             logger.error("No project data found in GetProjectId response")
             return
-        
-        # Log ALL fields in each plan to identify the correct field names
-        st.write("### Available Plans (Full Data):")
-        for idx, plan in enumerate(data['data']):
-            st.write(f"\n**Plan {idx}:**")
-            st.json(plan)
-            logger.info(f"Plan {idx} full data: {json.dumps(plan, indent=2)}")
         
         # Try multiple possible field names for plan identification
         possible_name_fields = ['planName', 'name', 'title', 'planTitle', 'description']
@@ -1070,7 +1068,7 @@ def format_chunk_locally(chunk, chunk_idx, chunk_size, dataset_name, location_df
         for name, count in sorted(activity_dict.items()):
             output += f"{name:<30} {count}\n"
             total_activities += count
-    
+
     output += f"Total Completed Activities: {total_activities}"
     return output
 
@@ -2143,7 +2141,6 @@ def AnalyzeStatusManually(email: str = None, password: str = None) -> Tuple[Dict
     asite_df = pd.DataFrame(asite_data) if asite_data else pd.DataFrame(columns=["Dataset", "Tower", "Activity Name", "Count"])
 
     # PROCESS COS DATA
-    st.write("### Processing COS Data...")
     cos_data = []
 
     tower_mappings = [
@@ -2153,13 +2150,8 @@ def AnalyzeStatusManually(email: str = None, password: str = None) -> Tuple[Dict
         ('cos_df_structure', 'Structure', 'Structure')
     ]
 
-    st.write("### Debug: Available COS session state keys:")
-    cos_keys = [k for k in st.session_state.keys() if k.lower().startswith('cos_')]
-    st.write(f"Found COS keys: {cos_keys}")
-
     for df_key, display_name, short_name in tower_mappings:
         tower_df = st.session_state.get(df_key)
-        st.write(f"#### Processing {display_name}...")
         
         if tower_df is not None and isinstance(tower_df, pd.DataFrame) and not tower_df.empty:
             total_rows = len(tower_df)
@@ -2185,13 +2177,13 @@ def AnalyzeStatusManually(email: str = None, password: str = None) -> Tuple[Dict
     cos_df = pd.DataFrame(cos_data) if cos_data else pd.DataFrame(columns=["Tower", "Activity Name", "Count"])
 
     # Show debug info
-    st.write("### COS Data Debug:")
-    st.write(f"Total COS records created: {len(cos_data)}")
+    debug_ui("### COS Data Debug:")
+    debug_ui(f"Total COS records created: {len(cos_data)}")
     if not cos_df.empty:
-        st.write(cos_df.head(10))
-        st.write(f"COS DataFrame shape: {cos_df.shape}")
+        debug_ui(cos_df.head(10))
+        debug_ui(f"COS DataFrame shape: {cos_df.shape}")
     else:
-        st.write("COS DataFrame is empty!")
+        debug_ui("COS DataFrame is empty!")
 
     # Log dataframes for debugging
     try:
@@ -2200,10 +2192,10 @@ def AnalyzeStatusManually(email: str = None, password: str = None) -> Tuple[Dict
     except Exception:
         logger.exception("Error logging dataframes")
 
-    st.write("### Asite DataFrame (Debug):")
-    st.write(asite_df)
-    st.write("### COS DataFrame (Debug):")
-    st.write(cos_df)
+    debug_ui("### Asite DataFrame (Debug):")
+    debug_ui(asite_df)
+    debug_ui("### COS DataFrame (Debug):")
+    debug_ui(cos_df)
 
     combined_data = {
         "COS": cos_df if not cos_df.empty else pd.DataFrame(columns=["Tower", "Activity Name", "Count"]),
@@ -2222,17 +2214,17 @@ def AnalyzeStatusManually(email: str = None, password: str = None) -> Tuple[Dict
             ai_response = None
             st.session_state['ai_response'] = None
 
-    st.write("### Categorized Activity Counts (COS and Asite):")
+    debug_ui("### Categorized Activity Counts (COS and Asite):")
     if ai_response:
         try:
             ai_data = json.loads(ai_response) if isinstance(ai_response, str) else ai_response
-            st.json(ai_data)
+            debug_ui(ai_data)
         except (json.JSONDecodeError, TypeError) as e:
             st.error(f"Failed to parse AI response as JSON: {str(e)}")
-            st.text(str(ai_response)[:500])
+            debug_ui(str(ai_response)[:500])
 
     end_time = time.time()
-    st.write(f"Total execution time: {end_time - start_time:.2f} seconds")
+    logger.info("Eligo checklist analysis completed in %.2f seconds", end_time - start_time)
     
     return combined_data, outputs
     
@@ -3763,14 +3755,12 @@ def display_activity_count():
         
 st.markdown(
     """
-    <h1 style='font-family: "Arial Black", Gadget, sans-serif; 
-               color: red; 
-               font-size: 48px; 
-               text-align: center;'>
-        CheckList - Report
-    </h1>
+    <div class="section-card">
+        <h3>Eligo Checklist</h3>
+        <p>Use this module to initialize project data, compare COS and Asite counts, and download the Eligo checklist report.</p>
+    </div>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 
@@ -4809,15 +4799,15 @@ def generate_consolidated_Checklist_excel(combined_data):
 def run_analysis_and_display_final():
     """Final fixed version with complete direct data processing"""
     try:
-        st.write("Running status analysis...")
+        debug_ui("Running status analysis...")
         combined_data, outputs = AnalyzeStatusManually()
         st.success("Status analysis completed successfully!")
 
-        st.write("Displaying activity counts...")
+        debug_ui("Displaying activity counts...")
         display_activity_count()
         st.success("Activity counts displayed successfully!")
 
-        st.write("Generating consolidated checklist Excel file (Direct Processing - No AI)...")
+        debug_ui("Generating consolidated checklist Excel file (Direct Processing - No AI)...")
         with st.spinner("Generating Excel file... This may take a moment."):
             # Use raw data only - no AI parsing
             excel_file = generate_consolidated_Checklist_excel(combined_data)

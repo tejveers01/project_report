@@ -993,7 +993,7 @@ def format_chunk_locally(chunk, chunk_idx, chunk_size, dataset_name, location_df
         for name, count in sorted(activity_dict.items()):
             output += f"{name:<30} {count}\n"
             total_activities += count
-    
+
     output += f"Total Completed Activities: {total_activities}"
     return output
 
@@ -2933,14 +2933,12 @@ def run_analysis_and_display():
 # Streamlit UI
 st.markdown(
     """
-    <h1 style='font-family: "Arial Black", Gadget, sans-serif; 
-               color: red; 
-               font-size: 48px; 
-               text-align: center;'>
-        CheckList - Report
-    </h1>
+    <div class="section-card">
+        <h3>EWS Checklist</h3>
+        <p>Run initialization, review activity counts, and generate the consolidated checklist report for the EWS module.</p>
+    </div>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 # Initialize and Fetch Data
@@ -2963,7 +2961,10 @@ if st.sidebar.button("Initialize and Fetch Data"):
         loop.close()
 
 # Analyze and Display
-st.sidebar.title("📊 Status Analysis")
+st.sidebar.markdown(
+    "<h2 style='color:#000000; margin-bottom:0.4rem;'>Status Analysis</h2>",
+    unsafe_allow_html=True,
+)
 if st.sidebar.button("Analyze and Display Activity Counts"):
     try:
         run_analysis_and_display()  # This function already handles the full workflow

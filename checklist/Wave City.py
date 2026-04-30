@@ -511,7 +511,7 @@ def format_chunk_locally(chunk, chunk_idx, chunk_size, dataset_name, location_df
         for name, count in sorted(activity_dict.items()):
             output += f"{name:<30} {count}\n"
             total_activities += count
-    
+
     output += f"Total Completed Activities: {total_activities}"
     return output
 
@@ -2249,14 +2249,12 @@ def run_analysis_and_display():
 # Streamlit UI
 st.markdown(
     """
-    <h1 style='font-family: "Arial Black", Gadget, sans-serif; 
-               color: red; 
-               font-size: 48px; 
-               text-align: center;'>
-        CheckList - Report
-    </h1>
+    <div class="section-card">
+        <h3>Wave City Checklist</h3>
+        <p>Initialize the Wave City data flow, review stage-based checklist status, and export the final Excel report from here.</p>
+    </div>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 # Initialize and Fetch Data
