@@ -30,7 +30,7 @@ COS_API_KEY = os.getenv("COS_API_KEY")
 COS_CRN = os.getenv("COS_SERVICE_INSTANCE_CRN")
 COS_ENDPOINT = os.getenv("COS_ENDPOINT")
 BUCKET = os.getenv("COS_BUCKET_NAME")
-KRA_FOLDER = os.getenv("KRA_FOLDER", "")
+KRA_FOLDER = os.getenv("KRA_FOLDER", "Milestone/")
 EDEN_TRACKER_FOLDER = os.getenv("EDEN_TRACKER_FOLDER", "Eden/")
 
 # ======================= HARDCODED COLUMN MAPPINGS =======================
@@ -120,13 +120,12 @@ def find_latest_kra_file(cos_client, bucket_name: str, folder_prefix: str = "") 
         kra_files = []
         
         for obj in response['Contents']:
-            file_key = obj['Key']
+            file_key = obj.get('Key')
+            if not isinstance(file_key, str) or file_key.endswith('/'):
+                continue
             filename = os.path.basename(file_key)
             filename_lower = filename.lower()
-            
-            if file_key.endswith('/'):
-                continue
-            
+
             is_kra = 'kra' in filename_lower and 'milestone' in filename_lower
             is_excel = filename_lower.endswith(('.xlsx', '.xls'))
             
@@ -205,13 +204,12 @@ def find_tracker_for_month(cos_client, bucket_name: str, target_month: int, targ
         matching_trackers = []
         
         for obj in response['Contents']:
-            file_key = obj['Key']
+            file_key = obj.get('Key')
+            if not isinstance(file_key, str) or file_key.endswith('/'):
+                continue
             filename = os.path.basename(file_key)
             filename_lower = filename.lower()
-            
-            if file_key.endswith('/'):
-                continue
-            
+
             is_tracker = any(pattern in filename_lower for pattern in 
                            ['structure work tracker', 'tracker', 'structure tracker'])
             is_excel = filename_lower.endswith(('.xlsx', '.xls'))

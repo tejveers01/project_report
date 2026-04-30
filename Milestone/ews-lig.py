@@ -71,7 +71,12 @@ def list_files(cos, prefix):
     """List files from COS bucket"""
     try:
         response = cos.list_objects_v2(Bucket=BUCKET, Prefix=prefix)
-        return [obj['Key'] for obj in response.get('Contents', []) if not obj['Key'].endswith('/')]
+        keys = []
+        for obj in response.get('Contents', []):
+            key = obj.get('Key')
+            if isinstance(key, str) and not key.endswith('/'):
+                keys.append(key)
+        return keys
     except Exception as e:
         logger.error(f"Error listing files: {e}")
         return []
