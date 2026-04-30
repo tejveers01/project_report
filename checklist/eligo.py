@@ -9,7 +9,7 @@ from datetime import datetime
 import re
 import logging
 import os
-from dotenv import load_dotenv
+import sys
 import aiohttp
 import asyncio
 from typing import List, Tuple, Dict, Any
@@ -29,6 +29,13 @@ from Tower_G_and_H import *
 from datetime import date
 from dateutil.relativedelta import relativedelta
 
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(CURRENT_DIR)
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+from env_loader import load_root_env
+
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -37,7 +44,7 @@ logger = logging.getLogger(__name__)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Load environment variables
-load_dotenv()
+load_root_env()
 
 # IBM COS Configuration
 COS_API_KEY = os.getenv("COS_API_KEY")

@@ -5,9 +5,17 @@ import runpy
 import streamlit as st
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(CURRENT_DIR)
+
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
 if CURRENT_DIR not in sys.path:
     sys.path.insert(0, CURRENT_DIR)
+
+from env_loader import load_root_env
+
+load_root_env()
 
 CHECKLIST_PAGES = {
     "EDEN": "eden.py",

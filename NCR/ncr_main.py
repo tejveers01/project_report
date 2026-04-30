@@ -29,8 +29,11 @@ if ROOT_DIR not in sys.path:
 if CURRENT_DIR not in sys.path:
     sys.path.insert(0, CURRENT_DIR)
 
+from env_loader import load_root_env
+
+load_root_env()
+
 try:
-    from dotenv import load_dotenv
     from Veridiaa_new import *
     from EWS_Final import *
     from Eden_Final import *
@@ -48,10 +51,6 @@ except ModuleNotFoundError as exc:
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-# Load environment variables from root .env for local development
-ENV_PATH = os.path.join(ROOT_DIR, ".env")
-load_dotenv(dotenv_path=ENV_PATH, override=True)
 
 def get_secret(key, default=None):
     """Read secrets from Streamlit Cloud first, then fallback to root .env/local env."""

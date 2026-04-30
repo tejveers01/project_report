@@ -1,4 +1,5 @@
 import os
+import sys
 import re
 import logging
 from io import BytesIO
@@ -9,14 +10,20 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.utils.dataframe import dataframe_to_rows
-from dotenv import load_dotenv
 import ibm_boto3
 from ibm_botocore.client import Config
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(CURRENT_DIR)
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+from env_loader import load_root_env
 
 # ============================================================================
 # SETUP & CONFIGURATION
 # ============================================================================
-load_dotenv()
+load_root_env()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 

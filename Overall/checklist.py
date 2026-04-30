@@ -11,13 +11,20 @@ import re
 import logging
 import io
 import os
-from dotenv import load_dotenv
+import sys
 import time
 import aiohttp
 import asyncio
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(CURRENT_DIR)
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+from env_loader import load_root_env
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -27,7 +34,7 @@ logger = logging.getLogger(__name__)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Load environment variables
-load_dotenv()
+load_root_env()
 
 # WatsonX configuration
 WATSONX_API_URL = os.getenv("WATSONX_API_URL_1")

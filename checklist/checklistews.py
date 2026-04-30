@@ -9,14 +9,13 @@ from datetime import datetime
 import re 
 import logging
 import os
-from dotenv import load_dotenv
+import sys
 import aiohttp
 import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 import openpyxl
 import io
-from dotenv import load_dotenv
 from uuid import uuid4
 import ibm_boto3
 from ibm_botocore.client import Config
@@ -25,6 +24,13 @@ import xlsxwriter
 from EWS_LIG import *
 from dateutil.relativedelta import relativedelta
 import traceback
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(CURRENT_DIR)
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+from env_loader import load_root_env
 
 
 
@@ -40,7 +46,7 @@ logger = logging.getLogger(__name__)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Load environment variables
-load_dotenv()
+load_root_env()
 
 # IBM COS Configuration
 COS_API_KEY = os.getenv("COS_API_KEY")

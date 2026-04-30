@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 from io import BytesIO
 from datetime import datetime
@@ -7,15 +8,21 @@ from openpyxl import load_workbook, Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
-from dotenv import load_dotenv
 import ibm_boto3
 from ibm_botocore.client import Config
 import re
 from typing import Optional, Tuple, List, Dict, Any
 
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(CURRENT_DIR)
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+from env_loader import load_root_env
+
 # ======================= CONFIGURATION =======================
-load_dotenv()
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s")
+load_root_env()
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 # Cloud Storage Configuration

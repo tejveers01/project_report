@@ -11,7 +11,7 @@ from datetime import datetime
 import re
 import logging
 import os
-from dotenv import load_dotenv
+import sys
 import io
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 from requests.adapters import HTTPAdapter
@@ -19,12 +19,19 @@ from urllib3.util.retry import Retry
 from io import BytesIO
 import base64
 
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(CURRENT_DIR)
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+from env_loader import load_root_env
+
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Load environment variables
-load_dotenv()
+load_root_env()
 
 # WatsonX configuration
 WATSONX_API_URL = os.getenv("WATSONX_API_URL")

@@ -12,11 +12,9 @@ if str(CURRENT_DIR) not in sys.path:
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv(ROOT_DIR / ".env", override=True)
-except Exception:
-    pass
+from env_loader import load_root_env
+
+load_root_env()
 
 def load_local_module(module_name):
     module_path = CURRENT_DIR / f"{module_name}.py"

@@ -4,7 +4,10 @@ import sys
 import runpy
 import streamlit as st
 
+from env_loader import load_root_env
+
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+load_root_env()
 
 PROJECTS = {
     "checklist": {
