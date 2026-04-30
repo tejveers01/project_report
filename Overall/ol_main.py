@@ -181,11 +181,6 @@ def get_cos_files():
     except Exception as e:
         print(f"Error fetching COS files: {e}")
         return ["Error fetching COS files",e]
-    
-files = get_cos_files() or []
-# files = ["Error fetching COS files","Something Error"]
-# files = ["EWS LIG P4/Structure Work Tracker (31-05-2025).xlsx", "Eden/Structure Work Tracker (31-05-2025).xlsx", "Eligo/Structure Work Tracker (31-05-2025).xlsx", "Eligo/Tower G Finishing Tracker (01-06-2025).xlsx", "Eligo/Tower H Finishing Tracker (01-06-2025).xlsx", "Veridia/Structure Work Tracker (31-05-2025).xlsx", "Veridia/Tower 4 Finishing Tracker (13-05-2025).xlsx", "Veridia/Tower 5 Finishing Tracker (01-06-2025).xlsx", "Veridia/Tower 7 Finishing Tracker (01-06-2025).xlsx", "Wave City Club/Structure Work Tracker Wave City Club all Block (11-06-2025).xlsx"]
-# st.write(files)
 
 today = datetime.today()
 current_month = today.month
@@ -344,33 +339,33 @@ def GetOverallreport(files):
             return df
 
 
-# Group by project and subcategory (e.g. "Structure Work Tracker", "Tower G Finishing Tracker")
-project_map = defaultdict(lambda: {"current": [], "previous": []})
+def get_latest_report_files(files):
+    project_map = defaultdict(lambda: {"current": [], "previous": []})
 
-for file in files:
-    parts = file.split('/')
-    project = parts[0]
-    sub_path = '/'.join(parts[1:])  # handles nested folders
-    file_date = extract_date(file)
+    for file in files:
+        parts = file.split('/')
+        project = parts[0]
+        sub_path = '/'.join(parts[1:])
+        file_date = extract_date(file)
 
-    if not file_date:
-        continue
+        if not file_date:
+            continue
 
-    key = f"{project}/{sub_path.split('(')[0].strip()}"  # e.g., "Eligo/Tower G Finishing Tracker"
-    
-    if file_date.year == current_year and file_date.month == current_month:
-        project_map[key]["current"].append(file)
-    elif file_date.year == previous_year and file_date.month == previous_month:
-        project_map[key]["previous"].append(file)
+        key = f"{project}/{sub_path.split('(')[0].strip()}"
 
-# Final list of selected files
-selected_files = []
+        if file_date.year == current_year and file_date.month == current_month:
+            project_map[key]["current"].append(file)
+        elif file_date.year == previous_year and file_date.month == previous_month:
+            project_map[key]["previous"].append(file)
 
-for key, month_files in project_map.items():
-    if month_files["current"]:
-        selected_files.extend(month_files["current"])
-    elif month_files["previous"]:
-        selected_files.extend(month_files["previous"])
+    selected_files = []
+    for _, month_files in project_map.items():
+        if month_files["current"]:
+            selected_files.extend(month_files["current"])
+        elif month_files["previous"]:
+            selected_files.extend(month_files["previous"])
+
+    return selected_files
 
 
 render_app_header(
@@ -389,27 +384,45 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+loading_placeholder = st.empty()
+files = []
+
+with loading_placeholder.container():
+    st.markdown(
+        """
+        <div class="status-container">
+            <h4>Loading overall report</h4>
+            <p>Fetching the latest trackers and preparing the consolidated project view.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    with st.spinner("Loading latest project trackers..."):
+        files = get_cos_files() or []
+        if files and files[0] != "Error fetching COS files":
+            selected_files = get_latest_report_files(files)
+            st.session_state.overalldf = GetOverallreport(selected_files)
+
+loading_placeholder.empty()
+
 if files and files[0] == "Error fetching COS files":
     st.warning(files[1])
 elif not files:
     st.warning("No Excel files found in COS bucket.")
 else:
-    st.session_state.overalldf = GetOverallreport(selected_files)
-    st.session_state.overalldf = st.session_state.overalldf.drop_duplicates(subset='Tower Name')
-    st.session_state.check = True
-    if st.session_state.check:
-        if st.session_state.overalldf is not None and not st.session_state.overalldf.empty:
-            st.subheader("Tower Project Status Table")
-            st.dataframe(st.session_state.overalldf)
-        # st.write(df)
-            excel_data = to_excel(st.session_state.overalldf)
-            st.session_state.overall = excel_data
+    if st.session_state.overalldf is not None and not st.session_state.overalldf.empty:
+        st.session_state.overalldf = st.session_state.overalldf.drop_duplicates(subset='Tower Name')
+        st.session_state.check = True
 
-            # st.dataframe(df)
+    if st.session_state.get("check") and st.session_state.overalldf is not None and not st.session_state.overalldf.empty:
+        st.subheader("Tower Project Status Table")
+        st.dataframe(st.session_state.overalldf)
+        excel_data = to_excel(st.session_state.overalldf)
+        st.session_state.overall = excel_data
 
-            st.download_button(
-                label="Download as Excel",
-                data=excel_data,
-                file_name="Overall_Project_Report.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+        st.download_button(
+            label="Download as Excel",
+            data=excel_data,
+            file_name="Overall_Project_Report.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
