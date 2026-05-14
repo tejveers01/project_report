@@ -4,9 +4,6 @@ import requests
 import json
 import time
 import re
-
-
-
 WATSONX_API_URL = "https://us-south.ml.cloud.ibm.com/ml/v1/text/generation?version=2023-05-29"
 MODEL_ID = "meta-llama/llama-3-3-70b-instruct"
 PROJECT_ID = "4152f31e-6a49-40aa-9b62-0ecf629aae42"
@@ -110,23 +107,83 @@ def get_percentages(exceldatas):
                 return sheet
         return None
 
-    def _find_complete_column(df):
-        cols = [c for c in df.columns if "complete" in str(c).lower()]
-        if not cols:
+    def _parse_numeric_percent(value):
+        if pd.isna(value):
             return None
-        # Prefer MSP-specific completion column if available.
-        for c in cols:
-            if "msp" in str(c).lower():
-                return c
-        return cols[0]
 
-    def _to_percent(value):
-        num = float(value)
+        if isinstance(value, str):
+            cleaned = value.strip().replace(",", "")
+            if not cleaned:
+                return None
+            if cleaned.endswith("%"):
+                cleaned = cleaned[:-1].strip()
+                try:
+                    return float(cleaned)
+                except ValueError:
+                    return None
+            try:
+                value = float(cleaned)
+            except ValueError:
+                return None
+
+        try:
+            num = float(value)
+        except (TypeError, ValueError):
+            return None
+
         if 0 <= num <= 1:
-            return int(round(num * 100))
+            return num * 100
         if 0 <= num <= 100:
-            return int(round(num))
-        raise ValueError(f"Unexpected completion value: {value}")
+            return num
+        return None
+
+    def _find_complete_column(df):
+        candidates = []
+        for column in df.columns:
+            normalized = _normalize(column)
+            if any(keyword in normalized for keyword in ("complete", "completion", "progress")):
+                candidates.append(column)
+
+        if not candidates:
+            return None
+
+        for column in candidates:
+            normalized = _normalize(column)
+            if "msp" in normalized and "complete" in normalized:
+                return column
+        for column in candidates:
+            normalized = _normalize(column)
+            if normalized in {"complete", "percentcomplete", "completepercent", "msppercentcomplete"}:
+                return column
+        return candidates[0]
+
+    def _read_sheet_with_completion(sheet_name):
+        for header_row in range(6):
+            df = pd.read_excel(workbook, sheet_name=sheet_name, header=header_row)
+            completion_col = _find_complete_column(df)
+            if completion_col is not None:
+                return df, completion_col
+        return None, None
+
+    def _extract_completion_values(df, completion_col):
+        parsed_values = df[completion_col].map(_parse_numeric_percent).dropna()
+        valid_values = parsed_values[(parsed_values >= 0) & (parsed_values <= 100)]
+        return valid_values
+
+    def _fallback_extract_completion(sheet_name):
+        raw_df = pd.read_excel(workbook, sheet_name=sheet_name, header=None)
+        search_rows = min(len(raw_df.index), 12)
+
+        for row_idx in range(search_rows):
+            row = raw_df.iloc[row_idx]
+            for col_idx, value in enumerate(row):
+                normalized = _normalize(value)
+                if any(keyword in normalized for keyword in ("complete", "completion", "progress")):
+                    values = raw_df.iloc[row_idx + 1 :, col_idx].map(_parse_numeric_percent).dropna()
+                    values = values[(values >= 0) & (values <= 100)]
+                    if not values.empty:
+                        return values
+        return pd.Series(dtype=float)
 
     for i in towers:
         try:
@@ -134,16 +191,17 @@ def get_percentages(exceldatas):
             if not sheet_name:
                 raise ValueError(f"Sheet not found for {i}. Available sheets: {workbook.sheet_names}")
 
-            datas = pd.read_excel(workbook, sheet_name=sheet_name, header=0)
-            completion_col = _find_complete_column(datas)
-            if not completion_col:
-                raise ValueError(f"No completion column found in {sheet_name}")
+            datas, completion_col = _read_sheet_with_completion(sheet_name)
+            if datas is not None and completion_col is not None:
+                numeric_series = _extract_completion_values(datas, completion_col)
+            else:
+                numeric_series = _fallback_extract_completion(sheet_name)
 
-            numeric_series = pd.to_numeric(datas[completion_col], errors="coerce").dropna()
             if numeric_series.empty:
-                raise ValueError(f"No numeric completion values found in {sheet_name}:{completion_col}")
+                raise ValueError(f"No numeric completion values found in {sheet_name}")
 
-            structure_pct = _to_percent(numeric_series.iloc[0])
+            # Use the average completion across the tower sheet for a stable structure percentage.
+            structure_pct = int(round(numeric_series.mean()))
             eden.append({
                 "Project":"Eden",
                 "Tower Name":i,

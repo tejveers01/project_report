@@ -69,11 +69,36 @@ def run_project(project_key):
     runpy.run_path(app_file, run_name="__main__")
 
 
+def render_project_loader(project_title):
+    st.markdown(
+        f"""
+        <div class="page-loader">
+            <div class="page-loader-badge">Opening Report</div>
+            <div class="page-loader-spinner"></div>
+            <h1 class="page-loader-title">{project_title}</h1>
+            <p class="page-loader-copy">
+                Loading the selected project report. This screen will stay visible until the page finishes rendering.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 project = st.query_params.get("project")
 
 if project in PROJECTS:
-    run_project(project)
+    loader = st.empty()
+    with loader.container():
+        render_project_loader(PROJECTS[project]["title"])
+    with st.spinner(f"Opening {PROJECTS[project]['title']}..."):
+        run_project(project)
+    loader.empty()
 else:
+    loader = st.empty()
+    with loader.container():
+        render_project_loader("Reports Dashboard")
+
     st.markdown(
         """
         <div class="dashboard-shell">
@@ -126,3 +151,5 @@ else:
                 """,
                 unsafe_allow_html=True,
             )
+
+    loader.empty()

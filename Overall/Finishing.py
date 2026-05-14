@@ -3,11 +3,6 @@ import pandas as pd
 import requests
 import json
 import time
-
-
-
-
-
 WATSONX_API_URL = "https://us-south.ml.cloud.ibm.com/ml/v1/text/generation?version=2023-05-29"
 MODEL_ID = "meta-llama/llama-3-3-70b-instruct"
 PROJECT_ID = "4152f31e-6a49-40aa-9b62-0ecf629aae42"

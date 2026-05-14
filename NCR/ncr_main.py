@@ -34,6 +34,15 @@ from shared_ui import inject_shared_ui, render_app_header
 
 load_root_env()
 
+if os.getenv("WATSONX_API_KEY"):
+    os.environ["API_KEY"] = os.getenv("WATSONX_API_KEY")
+if os.getenv("WATSONX_API_URL"):
+    os.environ["WATSONX_API_URL"] = os.getenv("WATSONX_API_URL")
+if os.getenv("MODEL_ID"):
+    os.environ["MODEL_ID"] = os.getenv("MODEL_ID")
+if os.getenv("PROJECT_ID"):
+    os.environ["PROJECT_ID"] = os.getenv("PROJECT_ID")
+
 try:
     st.set_page_config(
         page_title="NCR Report",
@@ -45,6 +54,57 @@ except Exception:
     pass
 
 inject_shared_ui()
+
+
+def inject_ncr_ui() -> None:
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stAlert"] {
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(243, 244, 246, 0.98)) !important;
+            border: 1px solid rgba(156, 163, 175, 0.26) !important;
+            border-radius: 18px !important;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06) !important;
+        }
+
+        div[data-testid="stAlert"] * {
+            color: #334155 !important;
+        }
+
+        div[data-testid="stAlert"] svg {
+            fill: #64748b !important;
+        }
+
+        .stDownloadButton > button {
+            background: linear-gradient(145deg, #d1d5db, #9ca3af) !important;
+            color: #111827 !important;
+            box-shadow: 0 8px 18px rgba(107, 114, 128, 0.2) !important;
+            border: 1px solid rgba(107, 114, 128, 0.22) !important;
+        }
+
+        .stDownloadButton > button:hover,
+        .stDownloadButton > button:focus,
+        .stDownloadButton > button:active {
+            background: linear-gradient(145deg, #cbd5e1, #94a3b8) !important;
+            color: #0f172a !important;
+            box-shadow: 0 10px 22px rgba(100, 116, 139, 0.24) !important;
+            border: 1px solid rgba(100, 116, 139, 0.28) !important;
+        }
+
+        .stDownloadButton > button *,
+        .stDownloadButton > button:hover *,
+        .stDownloadButton > button:focus *,
+        .stDownloadButton > button:active * {
+            color: #111827 !important;
+            fill: #111827 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+inject_ncr_ui()
 
 try:
     from Veridiaa_new import *
@@ -76,7 +136,7 @@ def get_secret(key, default=None):
 WATSONX_API_URL = get_secret("WATSONX_API_URL")
 MODEL_ID = get_secret("MODEL_ID")
 PROJECT_ID = get_secret("PROJECT_ID")
-API_KEY = get_secret("API_KEY")
+API_KEY = get_secret("WATSONX_API_KEY") or get_secret("API_KEY")
 EMAIL_ID = get_secret("EMAIL_ID")
 PASSWORD = get_secret("PASSWORD")
 
@@ -163,6 +223,73 @@ def fetch_project_data(session_id, project_name, form_name, record_limit=1000):
             except Exception as e:
                 logger.error(f"Error fetching data: {str(e)}")
                 st.error(f"❌ Error fetching data: {str(e)}")
+                break
+
+    return {"responseHeader": {"results": len(all_data), "total_results": total_records}}, all_data, encoded_payload
+
+# Override with more defensive response handling so empty/HTML Asite responses
+# surface a useful message instead of a generic JSON decode error.
+def fetch_project_data(session_id, project_name, form_name, record_limit=1000):
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": f"ASessionID={session_id}",
+    }
+    all_data = []
+    start_record = 1
+    total_records = None
+    encoded_payload = ""
+
+    with st.spinner("Fetching data from Asite..."):
+        while True:
+            search_criteria = {
+                "criteria": [
+                    {"field": "ProjectName", "operator": 1, "values": [project_name]},
+                    {"field": "FormName", "operator": 1, "values": [form_name]},
+                ],
+                "recordStart": start_record,
+                "recordLimit": record_limit,
+            }
+            search_criteria_str = json.dumps(search_criteria)
+            encoded_payload = f"searchCriteria={urllib.parse.quote(search_criteria_str)}"
+            response = requests.post(
+                SEARCH_URL,
+                headers=headers,
+                data=encoded_payload,
+                verify=certifi.where(),
+                timeout=50,
+            )
+
+            try:
+                if response.status_code != 200:
+                    raise ValueError(f"Asite returned HTTP {response.status_code}")
+
+                response_text = response.text.strip()
+                if not response_text:
+                    raise ValueError("Asite returned an empty response. Please log in again and retry.")
+
+                content_type = response.headers.get("Content-Type", "")
+                if "json" not in content_type.lower() and response_text.startswith("<"):
+                    raise ValueError("Asite returned an HTML page instead of JSON. Your session may have expired.")
+
+                response_json = response.json()
+                if total_records is None:
+                    total_records = response_json.get("responseHeader", {}).get("results-total", 0)
+
+                all_data.extend(response_json.get("FormList", {}).get("Form", []))
+                st.info(f"Fetched {len(all_data)} / {total_records} records")
+
+                if start_record + record_limit - 1 >= total_records:
+                    break
+                start_record += record_limit
+            except json.JSONDecodeError:
+                preview = response.text.strip()[:180] if response.text else "No response body"
+                logger.error(f"Error fetching data: non-JSON response from Asite: {preview}")
+                st.error(f"Invalid JSON received from Asite. Preview: {preview}")
+                break
+            except Exception as e:
+                logger.error(f"Error fetching data: {str(e)}")
+                st.error(f"Error fetching data: {str(e)}")
                 break
 
     return {"responseHeader": {"results": len(all_data), "total_results": total_records}}, all_data, encoded_payload
@@ -326,6 +453,7 @@ else:
 
 # Generate Combined NCR Report
 if st.sidebar.button("NCR(Open&Close) Report", key="generate_report_button"):
+    combined_loading_notice = st.sidebar.info("Generating combined NCR report...")
 
     if project_name == "Wave Oakwood, Wave City":
         if st.session_state["ncr_df"] is not None:
@@ -478,6 +606,8 @@ if st.sidebar.button("NCR(Open&Close) Report", key="generate_report_button"):
 #=====================================================WAVE CITY CLUB=================================================================================
 
 
+    combined_loading_notice.empty()
+
 # Helper function to generate report title
 def generate_report_title(prefix):
     now = datetime.now()  # Current date: April 25, 2025
@@ -488,6 +618,7 @@ def generate_report_title(prefix):
 
 # Generate Safety NCR Report
 if st.sidebar.button("Safety NCR Report", key="safety_ncr"):
+    safety_loading_notice = st.sidebar.info("Generating safety NCR report...")
     if project_name == "Wave Oakwood, Wave City":
         if st.session_state["safety_df"] is not None:
             safety_df = st.session_state["safety_df"]
@@ -687,9 +818,12 @@ if st.sidebar.button("Safety NCR Report", key="safety_ncr"):
 
 #===============================================CLUB============================ 
 
+    safety_loading_notice.empty()
+
     
 # Generate Housekeeping NCR Report
 if st.sidebar.button("Housekeeping NCR Report", key="housekeeping_ncr"):
+    housekeeping_loading_notice = st.sidebar.info("Generating housekeeping NCR report...")
     if project_name == "Wave Oakwood, Wave City":
         if st.session_state["housekeeping_df"] is not None:
             housekeeping_df = st.session_state["housekeeping_df"]
@@ -886,8 +1020,11 @@ if st.sidebar.button("Housekeeping NCR Report", key="housekeeping_ncr"):
             st.error("Please fetch data first!")
 
 
+    housekeeping_loading_notice.empty()
+
 # All Reports Button
 if st.sidebar.button("All_Report", key="All_Report"):
+    all_reports_loading_notice = st.sidebar.info("Generating all NCR reports...")
 #===================================================VERIDIA=========================================================
     if project_name == "Wave Oakwood, Wave City":
         if st.session_state["ncr_df"] is not None and st.session_state["safety_df"] is not None and st.session_state["housekeeping_df"] is not None:
@@ -1369,3 +1506,4 @@ if project_name == "GH-8 Phase-2 (ELIGO) Wave City":
     else:
         st.error("Please fetch data first!")
 #=====================================================Eligo=================================================================================
+    all_reports_loading_notice.empty()

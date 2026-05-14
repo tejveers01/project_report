@@ -8,8 +8,8 @@ def inject_shared_ui() -> None:
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&display=swap');
 
 :root {
-    --bg-start: #f8fbff;
-    --bg-end: #e8f2ff;
+    --bg-start: #e5e7eb;
+    --bg-end: #d1d5db;
     --panel: rgba(255, 255, 255, 0.82);
     --panel-border: rgba(44, 126, 199, 0.12);
     --text-main: #0f2d4a;
@@ -80,6 +80,49 @@ section[data-testid="stSidebar"] h3 {
     font-weight: 800 !important;
 }
 
+/* Keep sidebar form controls readable on the light glass panel */
+section[data-testid="stSidebar"] [data-baseweb="input"] > div,
+section[data-testid="stSidebar"] [data-baseweb="base-input"] > div,
+section[data-testid="stSidebar"] [data-baseweb="select"] > div,
+section[data-testid="stSidebar"] .stDateInput > div > div,
+section[data-testid="stSidebar"] .stSelectbox > div > div,
+section[data-testid="stSidebar"] .stTextInput > div > div {
+    background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%) !important;
+    border: 1px solid rgba(107, 114, 128, 0.28) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 8px 18px rgba(15, 45, 74, 0.06) !important;
+}
+
+section[data-testid="stSidebar"] input,
+section[data-testid="stSidebar"] textarea,
+section[data-testid="stSidebar"] [data-baseweb="select"] input,
+section[data-testid="stSidebar"] [data-baseweb="select"] span,
+section[data-testid="stSidebar"] .stDateInput input {
+    color: var(--text-main) !important;
+    -webkit-text-fill-color: var(--text-main) !important;
+    caret-color: var(--text-main) !important;
+}
+
+section[data-testid="stSidebar"] input::placeholder,
+section[data-testid="stSidebar"] textarea::placeholder {
+    color: var(--text-soft) !important;
+    opacity: 1 !important;
+}
+
+section[data-testid="stSidebar"] svg {
+    fill: var(--text-main) !important;
+}
+
+section[data-testid="stSidebar"] [data-baseweb="input"] > div:focus-within,
+section[data-testid="stSidebar"] [data-baseweb="base-input"] > div:focus-within,
+section[data-testid="stSidebar"] [data-baseweb="select"] > div:focus-within,
+section[data-testid="stSidebar"] .stDateInput > div > div:focus-within,
+section[data-testid="stSidebar"] .stSelectbox > div > div:focus-within,
+section[data-testid="stSidebar"] .stTextInput > div > div:focus-within {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18) !important;
+}
+
 /* Fix for the download button and general buttons */
 .stButton > button,
 .stDownloadButton > button {
@@ -136,6 +179,59 @@ section[data-testid="stSidebar"] h3 {
     border-radius: 32px;
     padding: 2.5rem;
     box-shadow: var(--shadow);
+}
+
+.page-loader {
+    max-width: 760px;
+    margin: 3rem auto 2rem;
+    padding: 2rem;
+    border-radius: 28px;
+    border: 1px solid rgba(107, 114, 128, 0.22);
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(229, 231, 235, 0.9));
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+    text-align: center;
+}
+
+.page-loader-badge {
+    display: inline-block;
+    padding: 0.45rem 0.9rem;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.12);
+    color: var(--accent);
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.page-loader-title {
+    margin: 1rem 0 0.6rem;
+    color: var(--text-main);
+    font-size: clamp(1.8rem, 3vw, 2.4rem);
+    font-weight: 800;
+}
+
+.page-loader-copy {
+    margin: 0 auto;
+    max-width: 540px;
+    color: var(--text-soft);
+    font-size: 1rem;
+    line-height: 1.65;
+}
+
+.page-loader-spinner {
+    width: 56px;
+    height: 56px;
+    margin: 1.4rem auto 1rem;
+    border-radius: 50%;
+    border: 5px solid rgba(148, 163, 184, 0.25);
+    border-top-color: var(--accent);
+    animation: loader-spin 0.9s linear infinite;
+}
+
+@keyframes loader-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 .section-label {

@@ -30,6 +30,58 @@ except Exception:
 
 inject_shared_ui()
 
+
+def inject_checklist_ui() -> None:
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stAlert"] {
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(243, 244, 246, 0.98)) !important;
+            border: 1px solid rgba(156, 163, 175, 0.26) !important;
+            border-radius: 18px !important;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06) !important;
+        }
+
+        div[data-testid="stAlert"] * {
+            color: #334155 !important;
+        }
+
+        div[data-testid="stAlert"] svg {
+            fill: #64748b !important;
+        }
+
+        .stDownloadButton > button {
+            background: linear-gradient(145deg, #d1d5db, #9ca3af) !important;
+            color: #111827 !important;
+            box-shadow: 0 8px 18px rgba(107, 114, 128, 0.2) !important;
+            border: 1px solid rgba(107, 114, 128, 0.22) !important;
+        }
+
+        .stDownloadButton > button:hover,
+        .stDownloadButton > button:focus,
+        .stDownloadButton > button:active {
+            background: linear-gradient(145deg, #cbd5e1, #94a3b8) !important;
+            color: #0f172a !important;
+            box-shadow: 0 10px 22px rgba(100, 116, 139, 0.24) !important;
+            border: 1px solid rgba(100, 116, 139, 0.28) !important;
+            transform: translateY(-1px) !important;
+        }
+
+        .stDownloadButton > button *,
+        .stDownloadButton > button:hover *,
+        .stDownloadButton > button:focus *,
+        .stDownloadButton > button:active * {
+            color: #111827 !important;
+            fill: #111827 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+inject_checklist_ui()
+
 CHECKLIST_PAGES = {
     "EDEN": "eden.py",
     "EWS Checklist": "checklistews.py",

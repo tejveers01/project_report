@@ -66,6 +66,7 @@ from dateutil.relativedelta import relativedelta
 import re
 from collections import defaultdict
 from dateutil.relativedelta import relativedelta
+from requests.exceptions import RequestException
 
 try:
     import ibm_boto3
@@ -161,26 +162,36 @@ def to_excel(df):
     return output.getvalue()
 
 
-cos_client = ibm_boto3.client(
-    's3',
-    ibm_api_key_id=COS_API_KEY,
-    ibm_service_instance_id=COS_SERVICE_INSTANCE_ID,
-    config=Config(signature_version='oauth'),
-    endpoint_url=COS_ENDPOINT
-)
+def format_cos_error(exc):
+    message = str(exc).strip() or exc.__class__.__name__
+    if "/identity/token" in message:
+        return "IBM COS authentication failed while contacting IAM at `/identity/token`. Please check network access and COS credentials, then retry."
+    return message
+
+
+@st.cache_resource(show_spinner=False)
+def get_cos_client():
+    return ibm_boto3.client(
+        's3',
+        ibm_api_key_id=COS_API_KEY,
+        ibm_service_instance_id=COS_SERVICE_INSTANCE_ID,
+        config=Config(signature_version='oauth', connect_timeout=30, read_timeout=60, retries={'max_attempts': 3}),
+        endpoint_url=COS_ENDPOINT
+    )
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def get_cos_files():
     try:
-        response = cos_client.list_objects_v2(Bucket=COS_BUCKET)
+        response = get_cos_client().list_objects_v2(Bucket=COS_BUCKET)
         files = [obj['Key'] for obj in response.get('Contents', []) if obj['Key'].endswith('.xlsx')]
         if not files:
             print("No .xlsx files found in the configured COS bucket. Please ensure Excel files are uploaded.")
         return files
     except Exception as e:
-        print(f"Error fetching COS files: {e}")
-        return ["Error fetching COS files",e]
+        formatted_error = format_cos_error(e)
+        print(f"Error fetching COS files: {formatted_error}")
+        return ["Error fetching COS files", formatted_error]
 
 today = datetime.today()
 current_month = today.month
@@ -199,7 +210,7 @@ def extract_date(file_name):
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_cos_file_bytes(file_key):
-    response = cos_client.get_object(Bucket=COS_BUCKET, Key=file_key)
+    response = get_cos_client().get_object(Bucket=COS_BUCKET, Key=file_key)
     return response["Body"].read()
 
 
@@ -249,18 +260,11 @@ def fetch_selected_cos_files(file_map):
     if not keys_to_fetch:
         return bytes_map
 
-    max_workers = min(6, len(keys_to_fetch))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_key = {
-            executor.submit(fetch_cos_file_bytes, file_key): file_key
-            for file_key in keys_to_fetch
-        }
-        for future in concurrent.futures.as_completed(future_to_key):
-            file_key = future_to_key[future]
-            try:
-                bytes_map[file_key] = future.result()
-            except Exception as exc:
-                st.warning(f"Failed to fetch `{file_key}` from COS: {exc}")
+    for file_key in keys_to_fetch:
+        try:
+            bytes_map[file_key] = fetch_cos_file_bytes(file_key)
+        except Exception as exc:
+            st.warning(f"Failed to fetch `{file_key}` from COS: {format_cos_error(exc)}")
 
     return bytes_map
 
