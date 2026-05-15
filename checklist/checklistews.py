@@ -100,6 +100,10 @@ def get_missing_cos_config():
 if "slabreport" not in st.session_state:
     st.session_state.slabreport = {}
 
+
+class AsiteUnauthorizedError(Exception):
+    pass
+
 # Login Function
 async def login_to_asite(email, password):
     headers = {"Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded"}
@@ -119,6 +123,24 @@ async def login_to_asite(email, password):
     logger.error(f"Login failed: {response.status_code} - {response.text}")
     st.sidebar.error(f"❌ Login failed: {response.status_code} - {response.text}")
     return None
+
+
+def get_asite_credentials():
+    email = st.session_state.get("email") or EMAIL_ID
+    password = st.session_state.get("password") or PASSWORD
+    return email, password
+
+
+async def refresh_asite_session():
+    email, password = get_asite_credentials()
+    if not email or not password:
+        raise AsiteUnauthorizedError("Asite session expired and no credentials are available for re-login.")
+
+    logger.warning("Asite session appears expired. Attempting re-login.")
+    session_id = await login_to_asite(email, password)
+    if not session_id:
+        raise AsiteUnauthorizedError("Re-login to Asite failed after session expiry.")
+    return session_id
 
 # Function to generate access token
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=2, min=10, max=60))
@@ -273,13 +295,84 @@ async def GetProjectId():
 
 # Asynchronous Fetch Function
 async def fetch_data(session, url, headers):
-    async with session.get(url, headers=headers) as response:
-        if response.status == 200:
-            return await response.json()
-        elif response.status == 204:
-            return None
-        else:
-            raise Exception(f"Error fetching data: {response.status} - {await response.text()}")
+    attempts = 2
+    last_error = None
+
+    for attempt in range(attempts):
+        headers['Cookie'] = f"ASessionID={st.session_state.sessionid}"
+        async with session.get(url, headers=headers) as response:
+            if response.status == 204:
+                return None
+
+            response_text = await response.text()
+            content_type = (response.headers.get("Content-Type") or "").lower()
+            response_url = str(response.url)
+
+            if response.status == 200:
+                unauthorized_html = (
+                    "unauthorized.shtml" in response_url.lower()
+                    or "text/html" in content_type
+                    or "<html" in response_text.lower()
+                )
+                if unauthorized_html:
+                    last_error = AsiteUnauthorizedError(
+                        f"Asite returned unauthorized HTML for {url}"
+                    )
+                    logger.warning(str(last_error))
+                    if attempt < attempts - 1:
+                        await refresh_asite_session()
+                        continue
+                    raise last_error
+
+                try:
+                    return json.loads(response_text)
+                except json.JSONDecodeError as exc:
+                    preview = response_text[:250].replace("\n", " ")
+                    raise Exception(
+                        f"Non-JSON response from Asite. Content-Type: {content_type}. Preview: {preview}"
+                    ) from exc
+
+            last_error = Exception(f"Error fetching data: {response.status} - {response_text}")
+            if attempt < attempts - 1 and response.status in (401, 403):
+                await refresh_asite_session()
+                continue
+            raise last_error
+
+    raise last_error or Exception("Unknown error fetching data")
+
+
+def normalize_activity_df(raw_data, dataset_label):
+    expected_columns = ['activityName', 'activitySeq', 'formTypeId']
+    df = pd.DataFrame(raw_data)
+
+    if df.empty:
+        logger.warning(f"{dataset_label} activity data is empty.")
+        return pd.DataFrame(columns=expected_columns)
+
+    aliases = {
+        'activityId': 'activitySeq',
+        'ActivityId': 'activitySeq',
+        'ActivityID': 'activitySeq',
+        'activity_id': 'activitySeq',
+        'formType': 'formTypeId',
+        'form_type_id': 'formTypeId',
+    }
+    rename_map = {
+        source: target for source, target in aliases.items()
+        if source in df.columns and target not in df.columns
+    }
+    if rename_map:
+        df = df.rename(columns=rename_map)
+
+    missing = [col for col in expected_columns if col not in df.columns]
+    if missing:
+        logger.warning(
+            f"{dataset_label} activity data missing columns {missing}. Available columns: {list(df.columns)}"
+        )
+        for col in missing:
+            df[col] = None
+
+    return df[expected_columns]
 
 # Fetch All Structure Data
 async def GetAllDatas():
@@ -365,7 +458,10 @@ async def Get_Activity():
                 st.error(f"❌ Error fetching Structure Activity data: {str(e)}")
                 break
  
-    structure_activity_data = pd.DataFrame(all_structure_activity_data)[['activityName', 'activitySeq', 'formTypeId']]
+    structure_activity_data = normalize_activity_df(
+        all_structure_activity_data,
+        "EWS_LIG Structure"
+    )
 
     st.write("EWS_LIG STRUCTURE ACTIVITY DATA (activityName and activitySeq)")
     st.write(f"Total records: {len(structure_activity_data)}")
@@ -522,7 +618,10 @@ async def Get_Finishing_Activity():
                 st.error(f"âŒ Error fetching Finishing Activity data: {str(e)}")
                 break
 
-    finishing_activity_data = pd.DataFrame(all_finishing_activity_data)[['activityName', 'activitySeq', 'formTypeId']]
+    finishing_activity_data = normalize_activity_df(
+        all_finishing_activity_data,
+        "EWS_LIG Finishing"
+    )
 
     st.write("EWS_LIG FINISHING ACTIVITY DATA (activityName and activitySeq)")
     st.write(f"Total records: {len(finishing_activity_data)}")
@@ -725,16 +824,14 @@ async def Get_Activity_EWSLIG_Style():
                 st.error(f"Error fetching Structure Activity data: {str(e)}")
                 break
 
-    def safe_select(df, cols):
-        if df.empty:
-            return pd.DataFrame(columns=cols)
-        missing = [col for col in cols if col not in df.columns]
-        for col in missing:
-            df[col] = None
-        return df[cols]
-
-    finishing_activity_data = safe_select(pd.DataFrame(all_finishing_activity_data), ['activityName', 'activitySeq', 'formTypeId'])
-    structure_activity_data = safe_select(pd.DataFrame(all_structure_activity_data), ['activityName', 'activitySeq', 'formTypeId'])
+    finishing_activity_data = normalize_activity_df(
+        all_finishing_activity_data,
+        "EWS_LIG Finishing"
+    )
+    structure_activity_data = normalize_activity_df(
+        all_structure_activity_data,
+        "EWS_LIG Structure"
+    )
 
     st.write("EWS_LIG FINISHING ACTIVITY DATA (activityName, activitySeq, formTypeId)")
     st.write(f"Total records: {len(finishing_activity_data)}")
@@ -2533,6 +2630,8 @@ async def initialize_and_fetch_data(email, password):
         if not email or not password:
             st.sidebar.error("Please provide both email and password!")
             return False
+        st.session_state.email = email
+        st.session_state.password = password
         try:
             st.sidebar.write("Logging in...")
             session_id = await login_to_asite(email, password)
