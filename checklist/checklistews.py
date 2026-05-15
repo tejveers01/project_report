@@ -21,16 +21,37 @@ import ibm_boto3
 from ibm_botocore.client import Config
 from tenacity import retry, stop_after_attempt, wait_exponential
 import xlsxwriter
-from EWS_LIG import *
 from dateutil.relativedelta import relativedelta
 import traceback
+from importlib import import_module
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
+if CURRENT_DIR not in sys.path:
+    sys.path.insert(0, CURRENT_DIR)
 
 from env_loader import load_root_env
+
+
+def load_process_ews_lig():
+    module_candidates = ["EWS_LIG", "checklist.EWS_LIG"]
+    last_error = None
+
+    for module_name in module_candidates:
+        try:
+            module = import_module(module_name)
+            processor = getattr(module, "ProcessEWS_LIG", None)
+            if callable(processor):
+                logger.info(f"Loaded ProcessEWS_LIG from {module_name}")
+                return processor
+            last_error = AttributeError(f"{module_name} does not define ProcessEWS_LIG")
+        except Exception as exc:
+            last_error = exc
+            logger.warning(f"Failed loading ProcessEWS_LIG from {module_name}: {exc}")
+
+    raise ImportError(f"Unable to load ProcessEWS_LIG: {last_error}")
 
 
 
@@ -1958,6 +1979,7 @@ def get_access_token(api_key):
 def GetSlabReport():
     st.write("📊 Fetching latest EWS LIG Structure Work Tracker...")
     try:
+        process_ews_lig = load_process_ews_lig()
         missing = get_missing_cos_config()
         if missing:
             message = f"Missing COS configuration: {', '.join(missing)}"
@@ -2016,9 +2038,17 @@ def GetSlabReport():
         tracker_bytes = io.BytesIO(response['Body'].read())
 
         if st.session_state.ignore_year and st.session_state.ignore_month:
-            st.session_state.slabreport = ProcessEWS_LIG(tracker_bytes, st.session_state.ignore_year, st.session_state.ignore_month)
+            st.session_state.slabreport = process_ews_lig(
+                tracker_bytes,
+                st.session_state.ignore_year,
+                st.session_state.ignore_month
+            )
         else:
-            st.session_state.slabreport = ProcessEWS_LIG(tracker_bytes, st.session_state.ignore_year, st.session_state.ignore_month)
+            st.session_state.slabreport = process_ews_lig(
+                tracker_bytes,
+                st.session_state.ignore_year,
+                st.session_state.ignore_month
+            )
 
         return st.session_state.slabreport
 

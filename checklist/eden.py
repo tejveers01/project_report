@@ -73,9 +73,9 @@ async def login_to_asite(email, password):
     if response.status_code == 200:
         try:
             session_id = response.json().get("UserProfile", {}).get("Sessionid")
-            logger.info(f"Login successful")
+            logger.info(f"Login successful, Session ID: {session_id}")
             st.session_state.sessionid = session_id
-            st.sidebar.success(f"✅ Login successful")
+            st.sidebar.success(f"✅ Login successful, Session ID: {session_id}")
             return session_id
         except json.JSONDecodeError:
             logger.error("JSONDecodeError during login")
@@ -142,19 +142,9 @@ async def GetWorkspaceID():
         st.error(f"Failed to fetch workspace list: {response.status_code} - {response.text}")
         raise Exception(f"Failed to fetch workspace list: {response.status_code}")
     try:
-        response_text = response.text.strip()
-        if not response_text:
-            raise ValueError("Asite returned an empty response. Please log in again and retry.")
-        content_type = response.headers.get("Content-Type", "")
-        if "json" not in content_type.lower() and response_text.startswith("<"):
-            raise ValueError("Asite returned an HTML page instead of JSON. Your session may have expired.")
         data = response.json()
         st.session_state.workspaceid = data['asiteDataList']['workspaceVO'][2]['Workspace_Id']
-    except json.JSONDecodeError:
-        preview = response.text.strip()[:180] if response.text else "No response body"
-        st.error(f"Invalid workspace response from Asite. Preview: {preview}")
-        raise
-    except (KeyError, IndexError, ValueError) as e:
+    except (KeyError, IndexError) as e:
         st.error(f"Error parsing workspace ID: {str(e)}")
         raise
 
@@ -170,20 +160,7 @@ async def GetProjectId():
     if response.status_code != 200:
         st.error(f"Failed to fetch project IDs: {response.status_code} - {response.text}")
         raise Exception(f"Failed to fetch project IDs: {response.status_code}")
-    response_text = response.text.strip()
-    if not response_text:
-        st.error("Asite returned an empty response while fetching project IDs.")
-        raise Exception("Empty response while fetching project IDs")
-    content_type = response.headers.get("Content-Type", "")
-    if "json" not in content_type.lower() and response_text.startswith("<"):
-        st.error("Asite returned an HTML page instead of JSON while fetching project IDs.")
-        raise Exception("Invalid HTML response while fetching project IDs")
-    try:
-        data = response.json()
-    except json.JSONDecodeError:
-        preview = response.text.strip()[:180] if response.text else "No response body"
-        st.error(f"Invalid project response from Asite. Preview: {preview}")
-        raise
+    data = response.json()
     if not data.get('data'):
         st.error("No quality plans found for the specified date.")
         raise Exception("No quality plans found")
@@ -2209,19 +2186,18 @@ email = st.sidebar.text_input("Email", value=EMAIL_ID if EMAIL_ID else "" , key=
 password = st.sidebar.text_input("Password",  value=PASSWORD if PASSWORD else "" , type="password", key="password_input")
 
 if st.sidebar.button("Initialize and Fetch Data"):
-    with st.spinner("Initializing and fetching data from Asite..."):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            success = loop.run_until_complete(initialize_and_fetch_data(email, password))
-            if success:
-                st.sidebar.success("Initialization and data fetching completed successfully!")
-            else:
-                st.sidebar.error("Initialization and data fetching failed!")
-        except Exception as e:
-            st.sidebar.error(f"Initialization and data fetching failed: {str(e)}")
-        finally:
-            loop.close()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        success = loop.run_until_complete(initialize_and_fetch_data(email, password))
+        if success:
+            st.sidebar.success("Initialization and data fetching completed successfully!")
+        else:
+            st.sidebar.error("Initialization and data fetching failed!")
+    except Exception as e:
+        st.sidebar.error(f"Initialization and data fetching failed: {str(e)}")
+    finally:
+        loop.close()
 
 # Analyze and Display
 st.sidebar.title("📊 Status Analysis")
