@@ -98,7 +98,7 @@ def get_missing_cos_config():
 
 
 if "slabreport" not in st.session_state:
-    st.session_state.slabreport = {}
+    st.session_state.slabreport = []
 
 
 class AsiteUnauthorizedError(Exception):
@@ -374,6 +374,82 @@ def normalize_activity_df(raw_data, dataset_label):
 
     return df[expected_columns]
 
+
+def normalize_association_df(raw_data, dataset_label):
+    expected_columns = ['activitySeq', 'qiLocationId', 'statusName']
+    df = pd.DataFrame(raw_data)
+
+    if df.empty:
+        logger.warning(f"{dataset_label} association data is empty.")
+        return pd.DataFrame(columns=expected_columns)
+
+    status_mapping = {'#92D050': 'Completed', '#4CB0F0': 'Not Started', '#4C0F0': 'Not Started'}
+    if 'statusName' not in df.columns:
+        if 'statusColor' in df.columns:
+            df['statusName'] = df['statusColor'].map(status_mapping).fillna('Unknown')
+        else:
+            logger.warning(
+                f"{dataset_label} association data missing statusName/statusColor. Available columns: {list(df.columns)}"
+            )
+            df['statusName'] = 'Unknown'
+
+    aliases = {
+        'activityId': 'activitySeq',
+        'ActivityId': 'activitySeq',
+        'ActivityID': 'activitySeq',
+        'activity_id': 'activitySeq',
+        'locationId': 'qiLocationId',
+        'qi_location_id': 'qiLocationId',
+    }
+    rename_map = {
+        source: target for source, target in aliases.items()
+        if source in df.columns and target not in df.columns
+    }
+    if rename_map:
+        df = df.rename(columns=rename_map)
+
+    missing = [col for col in ['activitySeq', 'qiLocationId'] if col not in df.columns]
+    if missing:
+        logger.warning(
+            f"{dataset_label} association data missing columns {missing}. Available columns: {list(df.columns)}"
+        )
+        for col in missing:
+            df[col] = None
+
+    return df[expected_columns]
+
+
+def normalize_location_df(raw_data, dataset_label):
+    expected_columns = ['qiLocationId', 'qiParentId', 'name']
+    df = pd.DataFrame(raw_data)
+
+    if df.empty:
+        logger.warning(f"{dataset_label} location data is empty.")
+        return pd.DataFrame(columns=expected_columns)
+
+    aliases = {
+        'locationId': 'qiLocationId',
+        'parentId': 'qiParentId',
+        'locationName': 'name',
+    }
+    rename_map = {
+        source: target for source, target in aliases.items()
+        if source in df.columns and target not in df.columns
+    }
+    if rename_map:
+        df = df.rename(columns=rename_map)
+
+    missing = [col for col in expected_columns if col not in df.columns]
+    if missing:
+        logger.warning(
+            f"{dataset_label} location data missing columns {missing}. Available columns: {list(df.columns)}"
+        )
+        for col in missing:
+            df[col] = None
+
+    df['name'] = df['name'].fillna('Unknown')
+    return df[expected_columns]
+
 # Fetch All Structure Data
 async def GetAllDatas():
     record_limit = 1000
@@ -386,40 +462,25 @@ async def GetAllDatas():
         while True:
             url = f"https://adoddleak.asite.com/commonapi/qaplan/getPlanAssociation/?projectId={st.session_state.workspaceid}&planId={st.session_state.EWS_LIG_structure}&recordStart={start_record}&recordLimit={record_limit}"
             try:
-                async with session.get(url, headers=headers) as response:
-                    if response.status == 204:
-                        st.write("No more EWS_LIG Structure data available (204)")
-                        break
-                    data = await response.json()
-                    if 'associationList' in data and data['associationList']:
-                        all_structure_data.extend(data['associationList'])
-                    else:
-                        all_structure_data.extend(data if isinstance(data, list) else [])
-                    st.write(f"Fetched {len(all_structure_data[-record_limit:])} EWS_LIG Structure records (Total: {len(all_structure_data)})")
-                    if len(all_structure_data[-record_limit:]) < record_limit:
-                        break
-                    start_record += record_limit
+                data = await fetch_data(session, url, headers)
+                if data is None:
+                    st.write("No more EWS_LIG Structure data available (204)")
+                    break
+                if 'associationList' in data and data['associationList']:
+                    all_structure_data.extend(data['associationList'])
+                else:
+                    all_structure_data.extend(data if isinstance(data, list) else [])
+                st.write(f"Fetched {len(all_structure_data[-record_limit:])} EWS_LIG Structure records (Total: {len(all_structure_data)})")
+                if len(all_structure_data[-record_limit:]) < record_limit:
+                    break
+                start_record += record_limit
             except Exception as e:
                 st.error(f"❌ Error fetching Structure data: {str(e)}")
                 break
 
-    df_structure = pd.DataFrame(all_structure_data)
-    
-    desired_columns = ['activitySeq', 'qiLocationId']
-    if 'statusName' in df_structure.columns:
-        desired_columns.append('statusName')
-    elif 'statusColor' in df_structure.columns:
-        desired_columns.append('statusColor')
-        status_mapping = {'#92D050': 'Completed', '#4CB0F0': 'Not Started', '#4C0F0': 'Not Started'}
-        df_structure['statusName'] = df_structure['statusColor'].map(status_mapping).fillna('Unknown')
-        desired_columns.append('statusName')
-    else:
-        st.error("❌ Neither statusName nor statusColor found in data!")
-        return pd.DataFrame()
+    EWS_LIG_structure = normalize_association_df(all_structure_data, "EWS_LIG Structure")
 
-    EWS_LIG_structure = df_structure[desired_columns]    
-
-    st.write(f"EWS_LIG STRUCTURE ({', '.join(desired_columns)})")
+    st.write("EWS_LIG STRUCTURE (activitySeq, qiLocationId, statusName)")
     st.write(f"Total records: {len(EWS_LIG_structure)}")
     st.write(EWS_LIG_structure)  
     
@@ -513,7 +574,7 @@ async def Get_Location():
                 st.error(f"❌ Error fetching Structure Location data: {str(e)}")
                 break
         
-    structure_df = pd.DataFrame(all_structure_location_data)
+    structure_df = normalize_location_df(all_structure_location_data, "EWS_LIG Structure")
     
     if 'name' in structure_df.columns and structure_df['name'].isna().all():
         st.error("❌ All 'name' values in Structure Location data are missing or empty!")
@@ -542,40 +603,25 @@ async def GetFinishingDatas():
         while True:
             url = f"https://adoddleak.asite.com/commonapi/qaplan/getPlanAssociation/?projectId={st.session_state.workspaceid}&planId={st.session_state.EWS_LIG_finishing}&recordStart={start_record}&recordLimit={record_limit}"
             try:
-                async with session.get(url, headers=headers) as response:
-                    if response.status == 204:
-                        st.write("No more EWS_LIG Finishing data available (204)")
-                        break
-                    data = await response.json()
-                    if 'associationList' in data and data['associationList']:
-                        all_finishing_data.extend(data['associationList'])
-                    else:
-                        all_finishing_data.extend(data if isinstance(data, list) else [])
-                    st.write(f"Fetched {len(all_finishing_data[-record_limit:])} EWS_LIG Finishing records (Total: {len(all_finishing_data)})")
-                    if len(all_finishing_data[-record_limit:]) < record_limit:
-                        break
-                    start_record += record_limit
+                data = await fetch_data(session, url, headers)
+                if data is None:
+                    st.write("No more EWS_LIG Finishing data available (204)")
+                    break
+                if 'associationList' in data and data['associationList']:
+                    all_finishing_data.extend(data['associationList'])
+                else:
+                    all_finishing_data.extend(data if isinstance(data, list) else [])
+                st.write(f"Fetched {len(all_finishing_data[-record_limit:])} EWS_LIG Finishing records (Total: {len(all_finishing_data)})")
+                if len(all_finishing_data[-record_limit:]) < record_limit:
+                    break
+                start_record += record_limit
             except Exception as e:
                 st.error(f"âŒ Error fetching Finishing data: {str(e)}")
                 break
 
-    df_finishing = pd.DataFrame(all_finishing_data)
+    finishing_df = normalize_association_df(all_finishing_data, "EWS_LIG Finishing")
 
-    desired_columns = ['activitySeq', 'qiLocationId']
-    if 'statusName' in df_finishing.columns:
-        desired_columns.append('statusName')
-    elif 'statusColor' in df_finishing.columns:
-        desired_columns.append('statusColor')
-        status_mapping = {'#92D050': 'Completed', '#4CB0F0': 'Not Started', '#4C0F0': 'Not Started'}
-        df_finishing['statusName'] = df_finishing['statusColor'].map(status_mapping).fillna('Unknown')
-        desired_columns.append('statusName')
-    else:
-        st.error("âŒ Neither statusName nor statusColor found in finishing data!")
-        return pd.DataFrame()
-
-    finishing_df = df_finishing[desired_columns]
-
-    st.write(f"EWS_LIG FINISHING ({', '.join(desired_columns)})")
+    st.write("EWS_LIG FINISHING (activitySeq, qiLocationId, statusName)")
     st.write(f"Total records: {len(finishing_df)}")
     st.write(finishing_df)
 
@@ -677,7 +723,7 @@ async def Get_Finishing_Location():
                 st.error(f"âŒ Error fetching Finishing Location data: {str(e)}")
                 break
 
-    finishing_df = pd.DataFrame(all_finishing_location_data)
+    finishing_df = normalize_location_df(all_finishing_location_data, "EWS_LIG Finishing")
 
     if 'name' in finishing_df.columns and finishing_df['name'].isna().all():
         st.error("âŒ All 'name' values in Finishing Location data are missing or empty!")
@@ -742,23 +788,8 @@ async def GetAllDatas_EWSLIG_Style():
                 break
 
     def build_association_df(raw_data, dataset_label):
-        df = pd.DataFrame(raw_data)
-        desired_columns = ['activitySeq', 'qiLocationId']
-        if 'statusName' in df.columns:
-            desired_columns.append('statusName')
-        elif 'statusColor' in df.columns:
-            desired_columns.append('statusColor')
-            status_mapping = {'#92D050': 'Completed', '#4CB0F0': 'Not Started', '#4C0F0': 'Not Started'}
-            df['statusName'] = df['statusColor'].map(status_mapping).fillna('Unknown')
-            desired_columns.append('statusName')
-        elif df.empty:
-            return pd.DataFrame(columns=['activitySeq', 'qiLocationId', 'statusName'])
-        else:
-            st.error(f"Neither statusName nor statusColor found in {dataset_label} data!")
-            return pd.DataFrame()
-
-        result_df = df[desired_columns]
-        st.write(f"{dataset_label.upper()} ({', '.join(desired_columns)})")
+        result_df = normalize_association_df(raw_data, dataset_label)
+        st.write(f"{dataset_label.upper()} (activitySeq, qiLocationId, statusName)")
         st.write(f"Total records: {len(result_df)}")
         st.write(result_df)
         return result_df
@@ -920,8 +951,8 @@ async def Get_Location_EWSLIG_Style():
                 st.error(f"Error fetching Structure Location data: {str(e)}")
                 break
 
-    finishing_df = pd.DataFrame(all_finishing_location_data)
-    structure_df = pd.DataFrame(all_structure_location_data)
+    finishing_df = normalize_location_df(all_finishing_location_data, "EWS_LIG Finishing")
+    structure_df = normalize_location_df(all_structure_location_data, "EWS_LIG Structure")
 
     if 'name' in finishing_df.columns and finishing_df['name'].isna().all():
         st.error("All 'name' values in Finishing Location data are missing or empty!")
@@ -2053,24 +2084,6 @@ def process_finishing_tracker_file(file_stream, filename, tower_name=None):
         st.error(f"Error loading finishing tracker {filename}: {str(e)}")
         logger.exception(f"Error loading finishing tracker {filename}")
         return (None, None)
-
-# Function to get access token for WatsonX API
-def get_access_token(api_key):
-    try:
-        headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        data = {
-            "grant_type": "urn:ibm:params:oauth:grant-type:apikey",
-            "apikey": api_key
-        }
-        response = requests.post("https://iam.cloud.ibm.com/identity/token", headers=headers, data=data)
-        if response.status_code == 200:
-            return response.json().get("access_token")
-        else:
-            logger.error(f"Failed to get access token: {response.status_code} - {response.text}")
-            return None
-    except Exception as e:
-        logger.error(f"Error getting access token: {str(e)}")
-        return None
 
 #Slab code
 def GetSlabReport():
